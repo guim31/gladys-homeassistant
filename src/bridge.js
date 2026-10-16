@@ -397,12 +397,8 @@ export class Bridge {
         this.publishTransports().catch(() => {});
       }
     }
-    if (
-      this.watched?.(entityId) &&
-      previous &&
-      previous.state !== next.state &&
-      !this.inventory.entityDevice.has(entityId)
-    ) {
+    // Listed by the user: fired even when the entity is also offered as a device.
+    if (this.watched?.(entityId) && previous && previous.state !== next.state) {
       this.sceneEvent(TRIGGERS.ENTITY_CHANGED, {
         entity_id: entityId,
         state: short(next.state, 255),

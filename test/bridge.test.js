@@ -239,7 +239,7 @@ test('events: the listed event types and watched entities start scenes', async (
   const w = await world(t, {
     config: baseConfig({
       forward_events: 'zha_event, tag_scanned',
-      watched_entities: 'vacuum.*',
+      watched_entities: 'vacuum.*, input_boolean.guest_mode',
     }),
   });
   const types = w.ha.callsOf('subscribe_events').map((c) => c.event_type);
@@ -265,6 +265,10 @@ test('events: the listed event types and watched entities start scenes', async (
   w.ha.setState('vacuum.demo_vacuum_0_ground_floor', 'cleaning', { battery_level: 50 });
   await settle();
   assert.equal(w.fake.sceneEvents.length, 2);
+  // Watched by name, an entity also offered as a device fires too.
+  w.ha.setState('input_boolean.guest_mode', 'on');
+  await until(() => w.fake.sceneEvents.length === 3, { what: 'the watched helper' });
+  assert.equal(w.fake.sceneEvents[2].data.entity_id, 'input_boolean.guest_mode');
 });
 
 test('scene actions: service with data, script, scene, button', async (t) => {
