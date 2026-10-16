@@ -16,8 +16,8 @@ its only runtime dependency. It started from the official JavaScript template.
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/mapping.test.js          # one file
+node --test --test-name-pattern "lock"    # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -31,16 +31,21 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK client, registerHandlers, connect
+src/app.js                        SDK wiring: every handler of the manifest
+src/bridge.js                     Bridge: connection lifecycle, inventory, live states, commands, events
+src/ha/socket.js                  Home Assistant WebSocket client (auth, commands, events, ping)
+src/inventory.js                  states + registries -> Gladys devices, routes, writers (pure)
+src/mapping.js                    one entity -> features with read/write (pure), Gladys enums
+src/publisher.js                  states within 300/min, sensor spacing, 12 h heartbeat
+src/scenes.js                     scene actions (call_service, run_script, activate_scene, press_button)
+src/widgets.js                    dashboard widget `status`
+src/texts.js                      every text of the container, en/fr/de/es
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (same sections)
+test/                             node --test, SDK fake Gladys + test/helpers/fakeHa.js
+test/fixtures/ha/                 answers of a real Home Assistant 2026.10.1 (demo integration)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +75,9 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** is in four languages (English, French, German with
+  "du", Spanish with "usted"): action messages, manifest texts, feature name
+  suffixes, and `docs/{en,fr,de,es}.md`, kept in sync (`test/i18n.test.js`).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +239,31 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Home Assistant (propre à ce dépôt)
+
+- **API** : WebSocket `/api/websocket` uniquement (`auth` par jeton longue durée, `get_config`,
+  `get_states`, registres `config/{entity,device,area}_registry/list`, `subscribe_events`,
+  `call_service`, `ping`). Node 22+ a un `WebSocket` global : aucune dépendance. HA peut regrouper
+  plusieurs messages dans un tableau JSON : le client les sépare.
+- **Les registres sont réservés aux administrateurs** (`unauthorized` sinon) : on se replie sur un
+  appareil par entité, sans pièces, et le test de connexion le dit. Les abonnements à un type
+  d'événement autre que `state_changed` et les `*_registry_updated` exigent aussi un administrateur.
+- **Identifiants** : appareil `device:<id du registre d'appareils>` ou
+  `entity:<id du registre d'entités | entity_id>` ; fonctionnalité `<id d'entité>-<rôle>`. L'id du registre d'entités survit
+  au renommage d'un `entity_id` ; une entité sans registre (pas de `unique_id`) ne peut pas être
+  renommée. Les rôles (`state`, `brightness`, `color`, `color_temp`, `command`, `position`,
+  `contact`, `target`, `mode`, `current`, `value`, `power`, `playback`, `play`, `pause`, `next`,
+  `previous`, `volume`, `speed`) sont figés.
+- **Pièges vérifiés sur HA 2026.10.1** : `rgb_color` est calculé même en mode température (ne publier
+  la couleur que si `color_mode` est une couleur) ; `color_temp` en mireds a disparu au profit de
+  `color_temp_kelvin` / `min_color_temp_kelvin` ; un `climate` en `heat_cool` n'a pas d'attribut
+  `temperature` (seulement `target_temp_low/high`) ; `brightness` vaut `null` quand la lampe est
+  éteinte ; les entités YAML de la démo (serrures, lecteurs) n'ont pas d'entrée de registre.
+- **Sécurité** (choix par défaut de Guilhem) : serrures et volets `garage`/`gate`/`door` en lecture
+  seule sauf `allow_security_commands` ; l'action « appeler un service » refuse `lock.*`,
+  `alarm_control_panel.*` et l'ouverture d'un volet sensible (ou de tous les volets) sans ce
+  réglage. Consigne de thermostat refusée hors `min_temp`/`max_temp`, jamais bornée en silence.
+- **Test réel** : `ghcr.io/home-assistant/home-assistant:stable` avec `demo:` dans
+  `configuration.yaml`, onboarding et jeton créés par l'API (`/api/onboarding/users`,
+  `/auth/token`, puis `auth/long_lived_access_token` en WebSocket).
