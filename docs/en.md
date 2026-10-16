@@ -1,61 +1,187 @@
-# Demo Devices Template
+# Home Assistant bridge
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+This integration connects Gladys to **your Home Assistant** and offers its
+devices in the **Discovery** tab of Gladys: lights, switches and plugs,
+shutters, thermostats, sensors, detectors, media players, fans and locks. Once
+a device is added, its states follow Home Assistant **live**, and Gladys
+controls it **through Home Assistant**, which keeps its Zigbee, Z-Wave, Matter,
+Wi-Fi and cloud integrations. Move to Gladys at your own pace, room after room,
+or run both side by side. Everything stays on your local network. Unofficial,
+not affiliated with the Home Assistant project or Nabu Casa.
 
-## What you get
+> Tested with Home Assistant 2026.10 (its demo entities), not yet on many real
+> installations: your feedback is welcome on the GitHub repository.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+## Requirements
+
+- A recent Home Assistant (tested with 2026.10), reachable from the Gladys
+  machine (same network, or a VPN).
+- A **long-lived access token**, preferably of an **administrator** account:
+  only an administrator can read the devices and the areas of Home Assistant.
+  Without it, every entity becomes a device of its own and the area filter does
+  nothing.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+### Address and token
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+1. In Home Assistant, open your profile (bottom left), **Security** tab, then
+   **Long-lived access tokens → Create token**. Name it "Gladys" and copy the
+   token: Home Assistant shows it once.
+2. In Gladys, open the integration, **Configuration**:
+   - **Address of Home Assistant**: like `http://192.168.1.20:8123`, or
+     `https://ha.example.org` behind a reverse proxy. Not a `.local` name, not
+     `localhost`: the integration runs in its own container.
+   - **Long-lived access token**: paste it.
+3. Click **Test the connection**: the version of Home Assistant, the number of
+   devices offered and the kinds of entities not imported show up.
+4. Open the **Discovery** tab and add the devices you want. Their values are
+   sent as soon as they are added.
 
-## Actions
+### Choosing what to import
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+A Home Assistant install often has hundreds of entities. Gladys only offers:
 
-## Scenes
+- the **kinds of entities** ticked (lights, switches, covers, thermostats,
+  sensors, detectors, media players, fans, locks, toggle helpers);
+- in the **areas** listed, if any (names separated by commas, like
+  `Living Room, Kitchen`);
+- never the entities listed in **Entities to leave out**
+  (`sensor.*_signal_strength`, `*` matches any text);
+- plus the **entities to import anyway**, whatever the kinds and areas.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+Disabled and hidden entities, and the configuration and diagnostic entities
+(a LED brightness, a signal strength) are left out, except the battery levels.
+Only the devices you add in Gladys receive states: the others cost nothing.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+### Locks, garage doors and gates
 
-## Dashboard
+By default, **locks** and the covers Home Assistant classes as **garage door,
+gate or door** are **read-only** in Gladys: you see whether they are locked,
+open or closed, but neither a device, nor a scene, nor a voice assistant
+linked to Gladys can open them. Tick **Allow commands of locks, garage doors
+and gates** to control them (then click "Update" on these devices in the
+Discovery tab). Alarm panels are never imported; the scene action that calls a Home Assistant service refuses any command on them, on alarm panels and on every cover at once (`all`, an area, a device) while this box is not ticked.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+### Options
+
+- **Minimum interval between two values of a sensor**: 10 seconds by default.
+  A plug that reports its power every second is sent to Gladys at this pace.
+  Switches, lights, covers and detectors are never delayed.
+- **Language of the feature names**: the words added to the names of the
+  secondary features ("Kitchen – Brightness"). French by default.
+- **Event types to listen to** and **Entities not imported to watch**: see the
+  scene triggers below.
+
+## What you get
+
+### Devices
+
+One Gladys device per **Home Assistant device**, with the features of its
+entities; an entity without device (a helper, a template) is a device of its
+own. The name is the one of Home Assistant, with its area ("Ceiling (Living
+Room)").
+
+| Home Assistant                                      | In Gladys                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| `light`                                             | on/off, brightness, colour, colour temperature (if supported)  |
+| `switch`, `input_boolean`                           | a switch                                                       |
+| `cover`                                             | a shutter (or a curtain): open, close, stop, position          |
+| `cover` garage door, gate, door                     | open or closed (read-only unless allowed)                      |
+| `climate`                                           | setpoint, mode (off, heat, cool, auto), room temperature       |
+| `sensor` by device class                            | temperature, humidity, pressure, illuminance, CO2, PM2.5, PM10 |
+|                                                     | power, energy (index), voltage, current, battery, gas, water   |
+|                                                     | noise, wind speed, distance, duration, rain intensity, AQI     |
+| `binary_sensor` door, window, garage door, opening  | an opening sensor                                              |
+| `binary_sensor` motion, occupancy, presence         | a motion or presence sensor                                    |
+| `binary_sensor` smoke, moisture, CO, tamper, others | smoke, leak, CO, tamper sensors; a generic input otherwise     |
+| `media_player`                                      | power, play, pause, next, previous, volume, playback state     |
+| `fan`                                               | on/off, speed in %                                             |
+| `lock`                                              | locked or not (read-only unless allowed)                       |
+
+The **setpoint** of a thermostat stays within the limits Home Assistant gives
+for it (`min_temp`, `max_temp`): a value outside is refused, never changed into
+another one. A thermostat that only takes a range (heat_cool) shows its mode and
+temperature, not a setpoint. A colour light shows its colour in colour mode and
+its colour temperature in white mode.
+
+### Dashboard widget
+
+**Home Assistant**: the devices offered, the devices added, the entities
+followed, the connection and the version of Home Assistant, and a **Reload**
+button that reads the device list again.
+
+### Scene triggers
+
+- **Home Assistant event**: an event of a type listed in **Event types to
+  listen to** happened (`zha_event` of a Zigbee remote, `tag_scanned` of an NFC
+  tag, your own events). Filters: the event type, the entity. The scene
+  receives the event type, the entity and the event data (JSON).
+- **Home Assistant entity changed**: an entity listed in **Entities not
+  imported to watch** changed state (an alarm panel armed, a vacuum cleaning, a
+  person home). Filters: the entity, the new state. The scene receives the
+  entity, its name, the new and the previous state.
+
+For the entities imported in Gladys, use the usual "Device state" trigger.
+
+### Scene actions
+
+- **Call a Home Assistant action**: any service, as `domain.service`
+  (`light.turn_on`, `notify.mobile_app_phone`), with entities and data in JSON
+  (`{"brightness_pct": 50}`).
+- **Run a Home Assistant script**: `script.good_night`, with optional variables
+  in JSON.
+- **Activate a Home Assistant scene**: `scene.movie_time`.
+- **Press a Home Assistant button**: `button.restart_router`.
+
+## Scene examples
+
+- **Zigbee remote kept in Home Assistant**: trigger "Home Assistant event",
+  type `zha_event`; action: start a Gladys scene of your living room.
+- **Alarm armed in Home Assistant**: watch `alarm_control_panel.home`; trigger
+  "Home Assistant entity changed", new state `armed_away`; action: turn off the
+  Gladys lights and send you a message.
+- **Good night**: at 11 pm, action "Run a Home Assistant script"
+  `script.good_night`, then Gladys closes its own shutters.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+| Status message                                | What to do                                                                                |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Type the address and an access token          | Fill in both fields of the configuration.                                                 |
+| The address of Home Assistant is not valid    | Type `http://IP:8123` (or `https://…`), without user name or password.                    |
+| Home Assistant refused the access token       | Create a new token in your profile, Security tab, and paste it.                           |
+| Home Assistant is unreachable                 | Check the address from the Gladys machine (not `localhost`) and that Home Assistant runs. |
+| "not an administrator" in the connection test | Create the token with an administrator account to get devices and areas.                  |
+| A device is missing                           | Check the kinds and areas chosen, or add the entity to "Entities to import anyway".       |
+
+When Home Assistant restarts, its devices turn "unreachable" in Gladys; the
+integration reconnects within seconds to a minute and sends the values changed
+meanwhile. A device whose entities are all unavailable in Home Assistant is
+shown unreachable too. The logs of the integration (Gladys, integration page)
+give the details.
+
+## Limits
+
+- Home Assistant stays in charge of the devices: keep it running.
+- Not imported: alarm panels, vacuums, cameras, valves, humidifiers, water
+  heaters, sirens, numbers and selects, text and enum sensors, tilt of covers,
+  thermostat presets and fan modes. The connection test lists the kinds left
+  out; watch them with the "entity changed" trigger and control them with the
+  "Call a Home Assistant action" scene action.
+- The names of the features are set when a device is added in Gladys: a name
+  changed later in Home Assistant shows in the device name proposed in
+  Discovery, not in the device already added.
+- The external ids depend on the token: one from an administrator gives one
+  Gladys device per Home Assistant device, another one a device per entity.
+  Changing from one to the other offers the devices again in Discovery: keep
+  the same kind of token.
+- Scene events are limited to 120 per minute: a very chatty event type is cut
+  beyond, with one line in the logs.
+
+## Privacy
+
+Everything stays on your local network: the integration only talks to your Home
+Assistant, through its WebSocket API. The token is stored as a secret by Gladys
+and never written to the logs. Home Assistant is a project of the Open Home
+Foundation; this integration is not affiliated with it nor with Nabu Casa.

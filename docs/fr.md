@@ -1,67 +1,203 @@
-# Template de démonstration
+# Pont Home Assistant
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Cette intégration relie Gladys à **votre Home Assistant** et propose ses
+appareils dans l'onglet **Découverte** de Gladys : lampes, interrupteurs et
+prises, volets, thermostats, capteurs, détecteurs, lecteurs multimédias,
+ventilateurs et serrures. Une fois un appareil ajouté, ses états suivent Home
+Assistant **en direct**, et Gladys le pilote **à travers Home Assistant**, qui
+garde ses intégrations Zigbee, Z-Wave, Matter, Wi-Fi et cloud. Passez à Gladys
+à votre rythme, pièce par pièce, ou faites tourner les deux côte à côte. Tout
+reste sur votre réseau local. Non officielle, sans lien avec le projet Home
+Assistant ni avec Nabu Casa.
 
-## Ce que vous obtenez
+> Testée avec Home Assistant 2026.10 (ses entités de démonstration), pas encore
+> sur beaucoup d'installations réelles : vos retours sont les bienvenus sur le
+> dépôt GitHub.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+## Prérequis
+
+- Un Home Assistant récent (testé avec la 2026.10), joignable depuis la machine
+  de Gladys (même réseau, ou un VPN).
+- Un **jeton d'accès longue durée**, de préférence d'un compte
+  **administrateur** : seul un administrateur peut lire les appareils et les
+  pièces de Home Assistant. Sans lui, chaque entité devient un appareil à part
+  et le filtre par pièce ne fait rien.
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+### Adresse et jeton
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+1. Dans Home Assistant, ouvrez votre profil (en bas à gauche), onglet
+   **Sécurité**, puis **Jetons d'accès longue durée → Créer un jeton**.
+   Nommez-le « Gladys » et copiez le jeton : Home Assistant ne l'affiche qu'une
+   fois.
+2. Dans Gladys, ouvrez l'intégration, **Configuration** :
+   - **Adresse de Home Assistant** : comme `http://192.168.1.20:8123`, ou
+     `https://ha.example.org` derrière un proxy inverse. Pas de nom en
+     `.local`, pas `localhost` : l'intégration tourne dans son propre
+     conteneur.
+   - **Jeton d'accès longue durée** : collez-le.
+3. Cliquez sur **Tester la connexion** : la version de Home Assistant, le
+   nombre d'appareils proposés et les types d'entités non importées
+   s'affichent.
+4. Ouvrez l'onglet **Découverte** et ajoutez les appareils voulus. Leurs
+   valeurs sont envoyées dès l'ajout.
 
-## Actions
+### Choisir ce qui est importé
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+Une installation Home Assistant compte souvent des centaines d'entités. Gladys
+ne propose que :
 
-## Scènes
+- les **types d'entités** cochés (lampes, interrupteurs, volets, thermostats,
+  capteurs, détecteurs, lecteurs multimédias, ventilateurs, serrures, entrées
+  booléennes) ;
+- dans les **pièces** listées, s'il y en a (noms séparés par des virgules, comme
+  `Salon, Cuisine`) ;
+- jamais les entités listées dans **Entités à écarter**
+  (`sensor.*_signal_strength`, `*` remplace n'importe quel texte) ;
+- plus les **entités à importer quand même**, quels que soient les types et
+  les pièces.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+Les entités désactivées et masquées, et les entités de configuration et de
+diagnostic (luminosité d'une LED, force du signal) sont écartées, sauf les
+niveaux de batterie. Seuls les appareils ajoutés dans Gladys reçoivent des
+états : les autres ne coûtent rien.
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+### Serrures, portes de garage et portails
 
-## Tableau de bord
+Par défaut, les **serrures** et les volets que Home Assistant classe comme
+**porte de garage, portail ou porte** sont en **lecture seule** dans Gladys :
+vous voyez s'ils sont verrouillés, ouverts ou fermés, mais ni un appareil, ni
+une scène, ni un assistant vocal relié à Gladys ne peut les ouvrir. Cochez
+**Autoriser les commandes des serrures, portes de garage et portails** pour les
+piloter (puis cliquez sur « Mettre à jour » sur ces appareils dans l'onglet
+Découverte). Les alarmes ne sont jamais importées ; l'action de scène qui appelle un service Home Assistant refuse toute commande sur eux, sur les alarmes et sur tous les volets à la fois (`all`, une pièce, un appareil) tant que cette case n'est pas cochée.
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+### Options
+
+- **Intervalle minimum entre deux valeurs d'un capteur** : 10 secondes par
+  défaut. Une prise qui publie sa puissance chaque seconde est transmise à
+  Gladys à ce rythme. Interrupteurs, lampes, volets et détecteurs ne sont
+  jamais retardés.
+- **Langue des noms de fonctionnalités** : les mots ajoutés aux noms des
+  fonctionnalités secondaires (« Cuisine – Luminosité »). Français par défaut.
+- **Types d'événements à écouter** et **Entités non importées à surveiller** :
+  voir les déclencheurs de scène plus bas.
+
+## Ce que vous obtenez
+
+### Appareils
+
+Un appareil Gladys par **appareil Home Assistant**, avec les fonctionnalités de
+ses entités ; une entité sans appareil (une entrée, un modèle) est un appareil
+à part. Le nom est celui de Home Assistant, avec sa pièce (« Plafonnier
+(Salon) »).
+
+| Home Assistant                                      | Dans Gladys                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `light`                                             | marche/arrêt, luminosité, couleur, température de couleur (si gérées) |
+| `switch`, `input_boolean`                           | un interrupteur                                                       |
+| `cover`                                             | un volet (ou un rideau) : ouvrir, fermer, arrêter, position           |
+| `cover` porte de garage, portail, porte             | ouvert ou fermé (lecture seule sauf autorisation)                     |
+| `climate`                                           | consigne, mode (arrêt, chauffage, climatisation, auto), température   |
+| `sensor` selon sa classe                            | température, humidité, pression, luminosité, CO2, PM2,5, PM10         |
+|                                                     | puissance, énergie (index), tension, courant, batterie, gaz, eau      |
+|                                                     | bruit, vitesse du vent, distance, durée, intensité de pluie, AQI      |
+| `binary_sensor` porte, fenêtre, garage, ouverture   | un détecteur d'ouverture                                              |
+| `binary_sensor` mouvement, occupation, présence     | un détecteur de mouvement ou de présence                              |
+| `binary_sensor` fumée, humidité, CO, sabotage, etc. | détecteurs de fumée, de fuite, de CO, de sabotage ; une entrée sinon  |
+| `media_player`                                      | marche, lecture, pause, suivant, précédent, volume, état de lecture   |
+| `fan`                                               | marche/arrêt, vitesse en %                                            |
+| `lock`                                              | verrouillé ou non (lecture seule sauf autorisation)                   |
+
+La **consigne** d'un thermostat reste dans les limites que Home Assistant donne
+pour lui (`min_temp`, `max_temp`) : une valeur hors limites est refusée, jamais
+changée en une autre. Un thermostat qui n'accepte qu'une plage (heat_cool)
+affiche son mode et sa température, pas de consigne. Une lampe couleur affiche
+sa couleur en mode couleur et sa température de couleur en mode blanc.
+
+### Widget du tableau de bord
+
+**Home Assistant** : les appareils proposés, les appareils ajoutés, les entités
+suivies, la connexion et la version de Home Assistant, et un bouton
+**Relire** qui relit la liste des appareils.
+
+### Déclencheurs de scène
+
+- **Événement Home Assistant** : un événement d'un type listé dans **Types
+  d'événements à écouter** s'est produit (`zha_event` d'une télécommande
+  Zigbee, `tag_scanned` d'un tag NFC, vos propres événements). Filtres : le
+  type d'événement, l'entité. La scène reçoit le type, l'entité et les données
+  de l'événement (JSON).
+- **Entité Home Assistant modifiée** : une entité listée dans **Entités non
+  importées à surveiller** a changé d'état (alarme armée, aspirateur en
+  nettoyage, personne à la maison). Filtres : l'entité, le nouvel état. La
+  scène reçoit l'entité, son nom, le nouvel et l'ancien état.
+
+Pour les entités importées dans Gladys, utilisez le déclencheur habituel
+« Changement d'état d'un appareil ».
+
+### Actions de scène
+
+- **Appeler une action Home Assistant** : n'importe quel service, sous la forme
+  `domaine.service` (`light.turn_on`, `notify.mobile_app_telephone`), avec des
+  entités et des données en JSON (`{"brightness_pct": 50}`).
+- **Lancer un script Home Assistant** : `script.good_night`, avec des
+  variables facultatives en JSON.
+- **Activer une scène Home Assistant** : `scene.movie_time`.
+- **Appuyer sur un bouton Home Assistant** : `button.restart_router`.
+
+## Exemples de scènes
+
+- **Télécommande Zigbee gardée dans Home Assistant** : déclencheur « Événement
+  Home Assistant », type `zha_event` ; action : lancer une scène Gladys du
+  salon.
+- **Alarme armée dans Home Assistant** : surveillez
+  `alarm_control_panel.home` ; déclencheur « Entité Home Assistant modifiée »,
+  nouvel état `armed_away` ; action : éteindre les lampes de Gladys et vous
+  envoyer un message.
+- **Bonne nuit** : à 23 h, action « Lancer un script Home Assistant »
+  `script.good_night`, puis Gladys ferme ses propres volets.
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+| Message d'état                                   | Que faire                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Saisissez l'adresse et un jeton d'accès          | Remplissez les deux champs de la configuration.                                                |
+| L'adresse de Home Assistant n'est pas valide     | Saisissez `http://IP:8123` (ou `https://…`), sans nom d'utilisateur ni mot de passe.           |
+| Home Assistant refuse le jeton d'accès           | Créez un nouveau jeton dans votre profil, onglet Sécurité, et collez-le.                       |
+| Home Assistant est injoignable                   | Vérifiez l'adresse depuis la machine de Gladys (pas `localhost`) et que Home Assistant tourne. |
+| « pas administrateur » dans le test de connexion | Créez le jeton avec un compte administrateur pour avoir appareils et pièces.                   |
+| Un appareil manque                               | Vérifiez les types et pièces choisis, ou ajoutez l'entité à « Entités à importer quand même ». |
+
+Quand Home Assistant redémarre, ses appareils passent « injoignables » dans
+Gladys ; l'intégration se reconnecte en quelques secondes à une minute et
+envoie les valeurs changées entre-temps. Un appareil dont toutes les entités
+sont indisponibles dans Home Assistant est aussi affiché injoignable. Les
+journaux de l'intégration (Gladys, page de l'intégration) donnent le détail.
+
+## Limites
+
+- Home Assistant reste maître des appareils : gardez-le allumé.
+- Non importés : alarmes, aspirateurs, caméras, vannes, humidificateurs,
+  chauffe-eau, sirènes, nombres et listes, capteurs texte et énumérés,
+  inclinaison des volets, préréglages des thermostats et modes des
+  ventilateurs. Le test de connexion liste les types écartés ; surveillez-les
+  avec le déclencheur « entité modifiée » et pilotez-les avec l'action de scène
+  « Appeler une action Home Assistant ».
+- Les noms des fonctionnalités sont fixés à l'ajout de l'appareil dans Gladys :
+  un nom changé ensuite dans Home Assistant apparaît dans le nom proposé dans
+  Découverte, pas dans l'appareil déjà ajouté.
+- Les identifiants dépendent du jeton : celui d'un administrateur donne un
+  appareil Gladys par appareil Home Assistant, un autre un appareil par entité.
+  Passer de l'un à l'autre propose à nouveau les appareils dans Découverte :
+  gardez le même type de jeton.
+- Les événements de scène sont limités à 120 par minute : un type d'événement
+  très bavard est coupé au-delà, avec une ligne dans les journaux.
+
+## Confidentialité
+
+Tout reste sur votre réseau local : l'intégration ne parle qu'à votre Home
+Assistant, par son API WebSocket. Le jeton est stocké comme secret par Gladys
+et jamais écrit dans les journaux. Home Assistant est un projet de l'Open Home
+Foundation ; cette intégration n'a de lien ni avec elle ni avec Nabu Casa.

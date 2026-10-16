@@ -1,177 +1,784 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Home Assistant",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Bridge to Home Assistant: import its lights, covers, thermostats and sensors, and control them.",
+    "fr": "Pont vers Home Assistant : importez ses lampes, volets, thermostats et capteurs, et pilotez-les.",
+    "de": "Brücke zu Home Assistant: Lampen, Rollläden, Thermostate und Sensoren importieren und steuern.",
+    "es": "Puente a Home Assistant: importe sus luces, persianas, termostatos y sensores, y contrólelos."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-homeassistant:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-homeassistant/main/cover.png",
+  "categories": ["protocols", "lighting", "climate"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Home Assistant devices in Gladys",
+        "fr": "Vos appareils Home Assistant dans Gladys",
+        "de": "Deine Home-Assistant-Geräte in Gladys",
+        "es": "Sus dispositivos de Home Assistant en Gladys"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Gladys connects to your Home Assistant through its WebSocket API. Create a long-lived access token in Home Assistant (your profile, Security tab, at the bottom), preferably with an administrator account: the devices and areas are only readable with one. The devices then show up in the Discovery tab: add the ones you want.",
+        "fr": "Gladys se connecte à votre Home Assistant par son API WebSocket. Créez un jeton d'accès longue durée dans Home Assistant (votre profil, onglet Sécurité, tout en bas), de préférence avec un compte administrateur : les appareils et les pièces ne sont lisibles qu'avec lui. Les appareils apparaissent ensuite dans l'onglet Découverte : ajoutez ceux que vous voulez.",
+        "de": "Gladys verbindet sich über die WebSocket-API mit deinem Home Assistant. Erstelle in Home Assistant ein langlebiges Zugriffstoken (dein Profil, Reiter Sicherheit, ganz unten), am besten mit einem Administratorkonto: Nur damit sind Geräte und Bereiche lesbar. Die Geräte erscheinen dann im Reiter Entdecken: Füge die gewünschten hinzu.",
+        "es": "Gladys se conecta a su Home Assistant mediante su API WebSocket. Cree un token de acceso de larga duración en Home Assistant (su perfil, pestaña Seguridad, al final), preferiblemente con una cuenta de administrador: solo con ella se pueden leer los dispositivos y las áreas. Los dispositivos aparecen luego en la pestaña Descubrir: añada los que quiera."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
+          "label": {
+            "en": "Long-lived access tokens",
+            "fr": "Jetons d'accès longue durée",
+            "de": "Langlebige Zugriffstoken",
+            "es": "Tokens de acceso de larga duración"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "url",
+      "type": "string",
+      "label": {
+        "en": "Address of Home Assistant",
+        "fr": "Adresse de Home Assistant",
+        "de": "Adresse von Home Assistant",
+        "es": "Dirección de Home Assistant"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "description": {
+        "en": "Its IP address and port, as seen from the Gladys machine. Not a .local name, not localhost.",
+        "fr": "Son adresse IP et son port, vus depuis la machine de Gladys. Pas de nom en .local, pas localhost.",
+        "de": "IP-Adresse und Port, von der Gladys-Maschine aus gesehen. Kein .local-Name, nicht localhost.",
+        "es": "Su dirección IP y puerto, vistos desde la máquina de Gladys. Sin nombre .local, sin localhost."
+      },
+      "placeholder": {
+        "en": "http://192.168.1.20:8123",
+        "fr": "http://192.168.1.20:8123",
+        "de": "http://192.168.1.20:8123",
+        "es": "http://192.168.1.20:8123"
+      },
+      "required": true
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "token",
+      "type": "secret",
+      "label": {
+        "en": "Long-lived access token",
+        "fr": "Jeton d'accès longue durée",
+        "de": "Langlebiges Zugriffstoken",
+        "es": "Token de acceso de larga duración"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "required": true
     },
     {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "key": "domains",
+      "type": "multi_select",
+      "label": {
+        "en": "Kinds of entities to import",
+        "fr": "Types d'entités à importer",
+        "de": "Zu importierende Entitätstypen",
+        "es": "Tipos de entidades a importar"
+      },
       "required": false,
-      "default": "celsius",
+      "default": [
+        "light",
+        "switch",
+        "input_boolean",
+        "cover",
+        "climate",
+        "sensor",
+        "binary_sensor",
+        "media_player",
+        "fan",
+        "lock"
+      ],
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "light",
+          "label": {
+            "en": "Lights",
+            "fr": "Lampes",
+            "de": "Lampen",
+            "es": "Luces"
+          }
+        },
+        {
+          "value": "switch",
+          "label": {
+            "en": "Switches and plugs",
+            "fr": "Interrupteurs et prises",
+            "de": "Schalter und Steckdosen",
+            "es": "Interruptores y enchufes"
+          }
+        },
+        {
+          "value": "input_boolean",
+          "label": {
+            "en": "Toggle helpers",
+            "fr": "Entrées booléennes",
+            "de": "Schalter-Helfer",
+            "es": "Ayudantes de interruptor"
+          }
+        },
+        {
+          "value": "cover",
+          "label": {
+            "en": "Shutters and covers",
+            "fr": "Volets et stores",
+            "de": "Rollläden und Markisen",
+            "es": "Persianas y toldos"
+          }
+        },
+        {
+          "value": "climate",
+          "label": {
+            "en": "Thermostats",
+            "fr": "Thermostats",
+            "de": "Thermostate",
+            "es": "Termostatos"
+          }
+        },
+        {
+          "value": "sensor",
+          "label": {
+            "en": "Sensors",
+            "fr": "Capteurs",
+            "de": "Sensoren",
+            "es": "Sensores"
+          }
+        },
+        {
+          "value": "binary_sensor",
+          "label": {
+            "en": "Detectors (door, motion, smoke…)",
+            "fr": "Détecteurs (porte, mouvement, fumée…)",
+            "de": "Melder (Tür, Bewegung, Rauch…)",
+            "es": "Detectores (puerta, movimiento, humo…)"
+          }
+        },
+        {
+          "value": "media_player",
+          "label": {
+            "en": "Media players",
+            "fr": "Lecteurs multimédias",
+            "de": "Mediaplayer",
+            "es": "Reproductores multimedia"
+          }
+        },
+        {
+          "value": "fan",
+          "label": {
+            "en": "Fans",
+            "fr": "Ventilateurs",
+            "de": "Ventilatoren",
+            "es": "Ventiladores"
+          }
+        },
+        {
+          "value": "lock",
+          "label": {
+            "en": "Locks",
+            "fr": "Serrures",
+            "de": "Schlösser",
+            "es": "Cerraduras"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "areas",
+      "type": "string",
+      "label": {
+        "en": "Areas to import",
+        "fr": "Pièces à importer",
+        "de": "Zu importierende Bereiche",
+        "es": "Áreas a importar"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Names of Home Assistant areas, separated by commas. Empty: every area, and the entities without one.",
+        "fr": "Noms des pièces de Home Assistant, séparés par des virgules. Vide : toutes les pièces, et les entités sans pièce.",
+        "de": "Namen der Home-Assistant-Bereiche, durch Kommas getrennt. Leer: alle Bereiche und die Entitäten ohne Bereich.",
+        "es": "Nombres de las áreas de Home Assistant, separados por comas. Vacío: todas las áreas y las entidades sin área."
+      },
+      "placeholder": {
+        "en": "Living Room, Kitchen",
+        "fr": "Salon, Cuisine",
+        "de": "Wohnzimmer, Küche",
+        "es": "Salón, Cocina"
       },
       "required": false,
-      "default": 300,
-      "min": 60,
+      "default": ""
+    },
+    {
+      "key": "include_entities",
+      "type": "string",
+      "label": {
+        "en": "Entities to import anyway",
+        "fr": "Entités à importer quand même",
+        "de": "Trotzdem zu importierende Entitäten",
+        "es": "Entidades a importar de todos modos"
+      },
+      "description": {
+        "en": "Entity ids, separated by commas; * matches any text. Imported whatever the kinds and areas chosen.",
+        "fr": "Identifiants d'entités, séparés par des virgules ; * remplace n'importe quel texte. Importées quels que soient les types et pièces choisis.",
+        "de": "Entitäts-IDs, durch Kommas getrennt; * steht für beliebigen Text. Unabhängig von gewählten Typen und Bereichen importiert.",
+        "es": "Identificadores de entidades, separados por comas; * sustituye cualquier texto. Importadas sean cuales sean los tipos y áreas."
+      },
+      "placeholder": {
+        "en": "sensor.garden_temperature, light.*",
+        "fr": "sensor.garden_temperature, light.*",
+        "de": "sensor.garden_temperature, light.*",
+        "es": "sensor.garden_temperature, light.*"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "exclude_entities",
+      "type": "string",
+      "label": {
+        "en": "Entities to leave out",
+        "fr": "Entités à écarter",
+        "de": "Auszulassende Entitäten",
+        "es": "Entidades a excluir"
+      },
+      "description": {
+        "en": "Entity ids, separated by commas; * matches any text. Never imported.",
+        "fr": "Identifiants d'entités, séparés par des virgules ; * remplace n'importe quel texte. Jamais importées.",
+        "de": "Entitäts-IDs, durch Kommas getrennt; * steht für beliebigen Text. Nie importiert.",
+        "es": "Identificadores de entidades, separados por comas; * sustituye cualquier texto. Nunca se importan."
+      },
+      "placeholder": {
+        "en": "sensor.*_signal_strength",
+        "fr": "sensor.*_signal_strength",
+        "de": "sensor.*_signal_strength",
+        "es": "sensor.*_signal_strength"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "allow_security_commands",
+      "type": "boolean",
+      "label": {
+        "en": "Allow commands of locks, garage doors and gates",
+        "fr": "Autoriser les commandes des serrures, portes de garage et portails",
+        "de": "Befehle für Schlösser, Garagentore und Tore erlauben",
+        "es": "Permitir comandos de cerraduras, puertas de garaje y portones"
+      },
+      "description": {
+        "en": "Off: locks, garage doors, gates and doors show their state, but Gladys cannot open them, nor disarm an alarm, from a device, a scene or a voice assistant.",
+        "fr": "Désactivé : serrures, portes de garage, portails et portes affichent leur état, mais Gladys ne peut ni les ouvrir ni désarmer une alarme, depuis un appareil, une scène ou un assistant vocal.",
+        "de": "Aus: Schlösser, Garagentore, Tore und Türen zeigen ihren Zustand, aber Gladys kann sie weder öffnen noch eine Alarmanlage entschärfen, über Gerät, Szene oder Sprachassistent.",
+        "es": "Desactivado: cerraduras, puertas de garaje, portones y puertas muestran su estado, pero Gladys no puede abrirlos ni desarmar una alarma, desde un dispositivo, una escena o un asistente de voz."
+      },
+      "required": false,
+      "default": false
+    },
+    {
+      "key": "sensor_interval",
+      "type": "number",
+      "label": {
+        "en": "Minimum interval between two values of a sensor (s)",
+        "fr": "Intervalle minimum entre deux valeurs d'un capteur (s)",
+        "de": "Mindestabstand zwischen zwei Werten eines Sensors (s)",
+        "es": "Intervalo mínimo entre dos valores de un sensor (s)"
+      },
+      "description": {
+        "en": "A power meter that reports every second is sent to Gladys at this pace. Switches and detectors are never delayed.",
+        "fr": "Un compteur qui publie chaque seconde est transmis à Gladys à ce rythme. Interrupteurs et détecteurs ne sont jamais retardés.",
+        "de": "Ein Zähler, der jede Sekunde meldet, wird in diesem Takt an Gladys gesendet. Schalter und Melder werden nie verzögert.",
+        "es": "Un contador que informa cada segundo se envía a Gladys a este ritmo. Interruptores y detectores nunca se retrasan."
+      },
+      "required": false,
+      "default": 10,
+      "min": 0,
       "max": 3600
+    },
+    {
+      "key": "events",
+      "type": "section",
+      "label": {
+        "en": "Home Assistant events in your scenes",
+        "fr": "Événements Home Assistant dans vos scènes",
+        "de": "Home-Assistant-Ereignisse in deinen Szenen",
+        "es": "Eventos de Home Assistant en sus escenas"
+      },
+      "description": {
+        "en": "Gladys only listens to the events and entities listed here, to start your scenes (triggers \"Home Assistant event\" and \"Home Assistant entity changed\").",
+        "fr": "Gladys n'écoute que les événements et entités listés ici, pour déclencher vos scènes (déclencheurs « Événement Home Assistant » et « Entité Home Assistant modifiée »).",
+        "de": "Gladys hört nur auf die hier aufgeführten Ereignisse und Entitäten, um deine Szenen zu starten (Auslöser „Home-Assistant-Ereignis“ und „Home-Assistant-Entität geändert“).",
+        "es": "Gladys solo escucha los eventos y entidades indicados aquí, para iniciar sus escenas (disparadores «Evento de Home Assistant» y «Entidad de Home Assistant modificada»)."
+      }
+    },
+    {
+      "key": "forward_events",
+      "type": "string",
+      "label": {
+        "en": "Event types to listen to",
+        "fr": "Types d'événements à écouter",
+        "de": "Ereignistypen, auf die gehört wird",
+        "es": "Tipos de eventos a escuchar"
+      },
+      "description": {
+        "en": "Separated by commas. Examples: zha_event, deconz_event, tag_scanned, or your own events.",
+        "fr": "Séparés par des virgules. Exemples : zha_event, deconz_event, tag_scanned, ou vos propres événements.",
+        "de": "Durch Kommas getrennt. Beispiele: zha_event, deconz_event, tag_scanned oder eigene Ereignisse.",
+        "es": "Separados por comas. Ejemplos: zha_event, deconz_event, tag_scanned, o sus propios eventos."
+      },
+      "placeholder": {
+        "en": "zha_event, tag_scanned",
+        "fr": "zha_event, tag_scanned",
+        "de": "zha_event, tag_scanned",
+        "es": "zha_event, tag_scanned"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "watched_entities",
+      "type": "string",
+      "label": {
+        "en": "Entities not imported to watch",
+        "fr": "Entités non importées à surveiller",
+        "de": "Zu beobachtende, nicht importierte Entitäten",
+        "es": "Entidades no importadas a vigilar"
+      },
+      "description": {
+        "en": "Entity ids, separated by commas; * matches any text. Each change of their state can start a scene.",
+        "fr": "Identifiants d'entités, séparés par des virgules ; * remplace n'importe quel texte. Chaque changement d'état peut déclencher une scène.",
+        "de": "Entitäts-IDs, durch Kommas getrennt; * steht für beliebigen Text. Jede Zustandsänderung kann eine Szene starten.",
+        "es": "Identificadores de entidades, separados por comas; * sustituye cualquier texto. Cada cambio de estado puede iniciar una escena."
+      },
+      "placeholder": {
+        "en": "alarm_control_panel.home, vacuum.*",
+        "fr": "alarm_control_panel.home, vacuum.*",
+        "de": "alarm_control_panel.home, vacuum.*",
+        "es": "alarm_control_panel.home, vacuum.*"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
       "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "ha_event",
+      "label": {
+        "en": "Home Assistant event",
+        "fr": "Événement Home Assistant",
+        "de": "Home-Assistant-Ereignis",
+        "es": "Evento de Home Assistant"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "An event of a type listed in the configuration happened in Home Assistant.",
+        "fr": "Un événement d'un type listé dans la configuration s'est produit dans Home Assistant.",
+        "de": "In Home Assistant ist ein Ereignis eines in der Konfiguration aufgeführten Typs eingetreten.",
+        "es": "Ocurrió en Home Assistant un evento de un tipo indicado en la configuración."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "key": "event_type",
+          "type": "string",
+          "label": {
+            "en": "Event type",
+            "fr": "Type d'événement",
+            "de": "Ereignistyp",
+            "es": "Tipo de evento"
+          }
         },
         {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "key": "entity_id",
+          "type": "string",
+          "label": {
+            "en": "Entity (optional)",
+            "fr": "Entité (facultatif)",
+            "de": "Entität (optional)",
+            "es": "Entidad (opcional)"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "event_type",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Event type",
+            "fr": "Type d'événement",
+            "de": "Ereignistyp",
+            "es": "Tipo de evento"
+          }
+        },
+        {
+          "key": "entity_id",
+          "type": "string",
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
+        },
+        {
+          "key": "data",
+          "type": "string",
+          "label": {
+            "en": "Event data (JSON)",
+            "fr": "Données de l'événement (JSON)",
+            "de": "Ereignisdaten (JSON)",
+            "es": "Datos del evento (JSON)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "entity_state_changed",
+      "label": {
+        "en": "Home Assistant entity changed",
+        "fr": "Entité Home Assistant modifiée",
+        "de": "Home-Assistant-Entität geändert",
+        "es": "Entidad de Home Assistant modificada"
+      },
+      "description": {
+        "en": "A watched entity, not imported in Gladys, changed state (alarm, vacuum, person…).",
+        "fr": "Une entité surveillée, non importée dans Gladys, a changé d'état (alarme, aspirateur, personne…).",
+        "de": "Eine beobachtete, nicht in Gladys importierte Entität hat ihren Zustand geändert (Alarm, Sauger, Person…).",
+        "es": "Una entidad vigilada, no importada en Gladys, cambió de estado (alarma, aspiradora, persona…)."
+      },
+      "fields": [
+        {
+          "key": "entity_id",
+          "type": "string",
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
+        },
+        {
+          "key": "state",
+          "type": "string",
+          "label": {
+            "en": "New state (optional)",
+            "fr": "Nouvel état (facultatif)",
+            "de": "Neuer Zustand (optional)",
+            "es": "Nuevo estado (opcional)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "entity_id",
+          "type": "string",
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          }
+        },
+        {
+          "key": "state",
+          "type": "string",
+          "label": {
+            "en": "New state",
+            "fr": "Nouvel état",
+            "de": "Neuer Zustand",
+            "es": "Nuevo estado"
+          }
+        },
+        {
+          "key": "old_state",
+          "type": "string",
+          "label": {
+            "en": "Previous state",
+            "fr": "État précédent",
+            "de": "Vorheriger Zustand",
+            "es": "Estado anterior"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "call_service",
+      "label": {
+        "en": "Call a Home Assistant action",
+        "fr": "Appeler une action Home Assistant",
+        "de": "Home-Assistant-Aktion aufrufen",
+        "es": "Llamar a una acción de Home Assistant"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Calls any action (service) of Home Assistant, with an entity and data.",
+        "fr": "Appelle n'importe quelle action (service) de Home Assistant, avec une entité et des données.",
+        "de": "Ruft eine beliebige Aktion (Dienst) von Home Assistant auf, mit Entität und Daten.",
+        "es": "Llama a cualquier acción (servicio) de Home Assistant, con una entidad y datos."
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "key": "service",
+          "type": "string",
+          "label": {
+            "en": "Action (domain.service)",
+            "fr": "Action (domaine.service)",
+            "de": "Aktion (domain.service)",
+            "es": "Acción (dominio.servicio)"
+          },
+          "placeholder": {
+            "en": "light.turn_on",
+            "fr": "light.turn_on",
+            "de": "light.turn_on",
+            "es": "light.turn_on"
+          },
+          "required": true
+        },
+        {
+          "key": "entity_id",
+          "type": "string",
+          "label": {
+            "en": "Entities (optional, comma-separated)",
+            "fr": "Entités (facultatif, séparées par des virgules)",
+            "de": "Entitäten (optional, durch Kommas getrennt)",
+            "es": "Entidades (opcional, separadas por comas)"
+          },
+          "placeholder": {
+            "en": "light.kitchen",
+            "fr": "light.kitchen",
+            "de": "light.kitchen",
+            "es": "light.kitchen"
+          }
+        },
+        {
+          "key": "data",
+          "type": "string",
+          "label": {
+            "en": "Data (optional, JSON)",
+            "fr": "Données (facultatif, JSON)",
+            "de": "Daten (optional, JSON)",
+            "es": "Datos (opcional, JSON)"
+          },
+          "placeholder": {
+            "en": "{\"brightness_pct\": 50}",
+            "fr": "{\"brightness_pct\": 50}",
+            "de": "{\"brightness_pct\": 50}",
+            "es": "{\"brightness_pct\": 50}"
+          }
+        }
+      ]
+    },
+    {
+      "key": "run_script",
+      "label": {
+        "en": "Run a Home Assistant script",
+        "fr": "Lancer un script Home Assistant",
+        "de": "Home-Assistant-Skript ausführen",
+        "es": "Ejecutar un script de Home Assistant"
+      },
+      "description": {
+        "en": "Starts a script of Home Assistant, with optional variables.",
+        "fr": "Lance un script de Home Assistant, avec des variables facultatives.",
+        "de": "Startet ein Skript von Home Assistant, mit optionalen Variablen.",
+        "es": "Inicia un script de Home Assistant, con variables opcionales."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "script",
+          "type": "string",
+          "label": {
+            "en": "Script",
+            "fr": "Script",
+            "de": "Skript",
+            "es": "Script"
+          },
+          "placeholder": {
+            "en": "script.good_night",
+            "fr": "script.good_night",
+            "de": "script.good_night",
+            "es": "script.good_night"
+          },
+          "required": true
+        },
+        {
+          "key": "variables",
+          "type": "string",
+          "label": {
+            "en": "Variables (optional, JSON)",
+            "fr": "Variables (facultatif, JSON)",
+            "de": "Variablen (optional, JSON)",
+            "es": "Variables (opcional, JSON)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "activate_scene",
+      "label": {
+        "en": "Activate a Home Assistant scene",
+        "fr": "Activer une scène Home Assistant",
+        "de": "Home-Assistant-Szene aktivieren",
+        "es": "Activar una escena de Home Assistant"
+      },
+      "description": {
+        "en": "Activates a scene of Home Assistant.",
+        "fr": "Active une scène de Home Assistant.",
+        "de": "Aktiviert eine Szene von Home Assistant.",
+        "es": "Activa una escena de Home Assistant."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "scene",
+          "type": "string",
+          "label": {
+            "en": "Scene",
+            "fr": "Scène",
+            "de": "Szene",
+            "es": "Escena"
+          },
+          "placeholder": {
+            "en": "scene.movie_time",
+            "fr": "scene.movie_time",
+            "de": "scene.movie_time",
+            "es": "scene.movie_time"
+          },
           "required": true
         }
-      ],
-      "outputs": [
+      ]
+    },
+    {
+      "key": "press_button",
+      "label": {
+        "en": "Press a Home Assistant button",
+        "fr": "Appuyer sur un bouton Home Assistant",
+        "de": "Home-Assistant-Taste drücken",
+        "es": "Pulsar un botón de Home Assistant"
+      },
+      "description": {
+        "en": "Presses a button entity of Home Assistant (button or input_button).",
+        "fr": "Appuie sur une entité bouton de Home Assistant (button ou input_button).",
+        "de": "Drückt eine Tasten-Entität von Home Assistant (button oder input_button).",
+        "es": "Pulsa una entidad de botón de Home Assistant (button o input_button)."
+      },
+      "timeout_seconds": 30,
+      "fields": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "button",
+          "type": "string",
+          "label": {
+            "en": "Button",
+            "fr": "Bouton",
+            "de": "Taste",
+            "es": "Botón"
+          },
+          "placeholder": {
+            "en": "button.restart_router",
+            "fr": "button.restart_router",
+            "de": "button.restart_router",
+            "es": "button.restart_router"
+          },
+          "required": true
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "status",
+      "label": {
+        "en": "Home Assistant",
+        "fr": "Home Assistant",
+        "de": "Home Assistant",
+        "es": "Home Assistant"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Connection to Home Assistant, its version, devices added and entities followed.",
+        "fr": "Connexion à Home Assistant, sa version, appareils ajoutés et entités suivies.",
+        "de": "Verbindung zu Home Assistant, Version, hinzugefügte Geräte und verfolgte Entitäten.",
+        "es": "Conexión a Home Assistant, su versión, dispositivos añadidos y entidades seguidas."
+      },
+      "icon": "home",
+      "action_timeout_seconds": 30
     }
   ]
 }
