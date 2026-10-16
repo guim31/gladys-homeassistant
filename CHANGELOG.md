@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-16
+
 ### Added
 
 - Bridge to Home Assistant through its WebSocket API (long-lived access token):
@@ -31,3 +33,6 @@ the notes of the version's GitHub Release.
 - Dashboard widget: connection, version, devices offered and added, entities
   followed, Reload button.
 - Documentation in English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-homeassistant/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-homeassistant/releases/tag/v1.0.0
