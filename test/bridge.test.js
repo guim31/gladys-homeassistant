@@ -17,6 +17,7 @@ import {
   flushed,
   settle,
   until,
+  FAST_TIMINGS,
 } from './helpers/world.js';
 import { createLogger } from '@gladysassistant/integration-sdk';
 
@@ -32,8 +33,10 @@ test('connects, reads the inventory and offers the devices in Discovery', async 
   assert.equal(w.fake.connectionStatus.connected, true);
   assert.ok(w.fake.discoveredDevices.length >= 40);
   assert.deepEqual(
-    w.ha.calls.slice(0, 5).map((c) => c.type),
+    w.ha.calls.slice(0, 6).map((c) => c.type),
     [
+      // Subscribed first: no change lost between the snapshot and the events.
+      'subscribe_events',
       'get_config',
       'get_states',
       'config/entity_registry/list',
@@ -126,12 +129,17 @@ test('locks and garage doors: no command without the explicit permission', async
   });
   assert.equal(garage.success, false);
   assert.equal(w.ha.services().length, 0);
-  // Closing is never dangerous.
+  // Without the permission, a sensitive cover takes no command at all; another one does.
   const close = await w.fake.sceneAction('call_service', {
     service: 'cover.close_cover',
     entity_id: 'cover.garage_door',
   });
-  assert.equal(close.success, true, close.error);
+  assert.equal(close.success, false);
+  const window = await w.fake.sceneAction('call_service', {
+    service: 'cover.open_cover',
+    entity_id: 'cover.hall_window',
+  });
+  assert.equal(window.success, true, window.error);
 });
 
 test('locks: controllable once allowed in the configuration', async (t) => {
@@ -373,4 +381,79 @@ test('a normal cycle writes nothing at the info level', async (t) => {
   await w.fake.scanRequest();
   await flushed(w);
   assert.deepEqual(logs.stop(), []);
+});
+
+test('the security switch cannot be bypassed through another domain or target', async (t) => {
+  const w = await world(t);
+  const attempts = [
+    { service: 'homeassistant.toggle', entity_id: 'cover.garage_door' },
+    { service: 'homeassistant.turn_off', entity_id: 'lock.front_door' },
+    { service: 'scene.apply', data: '{"entities": {"lock.front_door": "unlocked"}}' },
+    {
+      service: 'scene.create',
+      data: '{"scene_id": "x", "entities": {"Cover.Garage_Door": "open"}}',
+    },
+    { service: 'cover.open_cover', data: '{"entity_id": "COVER.GARAGE_DOOR"}' },
+    { service: 'cover.open_cover', data: '{"entity_id": "all"}' },
+    { service: 'cover.open_cover', entity_id: 'cover.hall_window', data: '{"area_id": "garage"}' },
+    { service: 'cover.toggle' },
+    { service: 'homeassistant.turn_on', data: '{"device_id": "abc"}' },
+    { service: 'alarm_control_panel.alarm_disarm', entity_id: 'alarm_control_panel.security' },
+  ];
+  for (const fields of attempts) {
+    const ack = await w.fake.sceneAction('call_service', fields);
+    assert.equal(ack.success, false, JSON.stringify(fields));
+    assert.match(ack.error, /désactivées/, JSON.stringify(fields));
+  }
+  assert.equal(w.ha.services().length, 0);
+  // A precise, harmless target still works.
+  const ok = await w.fake.sceneAction('call_service', {
+    service: 'homeassistant.toggle',
+    entity_id: 'Switch.AC',
+  });
+  assert.equal(ok.success, true, ok.error);
+  assert.deepEqual(w.ha.services().at(-1).target, ['switch.ac']);
+});
+
+test('a passing registry error does not switch the external ids', async (t) => {
+  const ha = createHa();
+  ha.refuse.set('config/device_registry/list', { code: 'home_assistant_error', message: 'busy' });
+  const w = await world(t, { ha, waitOnline: false });
+  await until(() => w.bridge.status === 'unreachable', { what: 'the failed load' });
+  assert.equal(w.fake.discoveredDevices.length, 0, 'no device offered with other ids');
+  ha.refuse.clear();
+  await until(() => w.bridge.status === 'online', { what: 'the retry' });
+  assert.equal(w.bridge.limited, false);
+  assert.ok(w.fake.discoveredDevices.some((d) => d.external_id.includes(':device:')));
+});
+
+test('nothing is republished while Home Assistant is unreachable', async (t) => {
+  const w = await world(t, { timings: { ...FAST_TIMINGS, refreshInterval: 30 } });
+  const sw = await addDevice(w, deviceOf(w, 'switch.ac'));
+  await until(() => w.fake.lastState(sw.features[0].external_id) === 0, { what: 'the switch' });
+  w.ha.down = true;
+  w.ha.drop();
+  await until(() => w.bridge.status === 'unreachable', { what: 'unreachable' });
+  w.bridge.publisher.pending.clear();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(w.bridge.publisher.pending.size, 0);
+});
+
+test('Home Assistant still starting: the previous inventory stays until it runs', async (t) => {
+  const w = await world(t);
+  const count = w.fake.discoveredDevices.length;
+  const states = w.ha.data.states;
+  w.ha.data.config = { ...w.ha.data.config, state: 'NOT_RUNNING' };
+  w.ha.data.states = [];
+  w.ha.drop();
+  await until(() => w.ha.connects >= 2 && w.bridge.status === 'online', { what: 'reconnected' });
+  await settle();
+  assert.equal(w.fake.discoveredDevices.length, count, 'no empty Discovery while starting');
+  assert.ok(w.bridge.inventory.routes.has('light.kitchen_lights'));
+  w.ha.data.config = { ...w.ha.data.config, state: 'RUNNING' };
+  w.ha.data.states = states;
+  w.ha.fire('homeassistant_started', {});
+  await until(() => w.ha.callsOf('get_states').length >= 3, { what: 'the reload' });
+  await settle();
+  assert.equal(w.fake.discoveredDevices.length, count);
 });

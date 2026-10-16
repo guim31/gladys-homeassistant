@@ -70,9 +70,7 @@ siehst, ob sie verriegelt, offen oder geschlossen sind, aber weder ein Gerät
 noch eine Szene noch ein mit Gladys verbundener Sprachassistent kann sie
 öffnen. Kreuze **Befehle für Schlösser, Garagentore und Tore erlauben** an, um
 sie zu steuern (dann im Reiter Entdecken bei diesen Geräten auf
-„Aktualisieren“ klicken). Alarmanlagen werden nie importiert; die
-Szenenaktion, die einen Home-Assistant-Dienst aufruft, lehnt `lock.*` und
-`alarm_control_panel.*` ab, solange dieses Feld nicht angekreuzt ist.
+„Aktualisieren“ klicken). Alarmanlagen werden nie importiert; die Szenenaktion, die einen Home-Assistant-Dienst aufruft, lehnt jeden Befehl an sie, an Alarmanlagen und an alle Rollläden auf einmal (`all`, ein Bereich, ein Gerät) ab, solange dieses Feld nicht angekreuzt ist.
 
 ### Optionen
 
@@ -193,6 +191,10 @@ Integrationsseite) geben die Details.
 - Die Funktionsnamen werden beim Hinzufügen des Geräts in Gladys festgelegt:
   Ein später in Home Assistant geänderter Name erscheint im unter Entdecken
   angebotenen Namen, nicht im bereits hinzugefügten Gerät.
+- Die Kennungen hängen vom Token ab: Das eines Administrators ergibt ein
+  Gladys-Gerät pro Home-Assistant-Gerät, ein anderes ein Gerät pro Entität.
+  Ein Wechsel bietet die Geräte unter Entdecken neu an: Behalte dieselbe Art
+  von Token.
 - Szenenereignisse sind auf 120 pro Minute begrenzt: Ein sehr gesprächiger
   Ereignistyp wird darüber hinaus gekappt, mit einer Zeile im Protokoll.
 

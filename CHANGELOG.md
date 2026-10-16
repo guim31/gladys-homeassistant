@@ -22,8 +22,8 @@ the notes of the version's GitHub Release.
   detectors, media players, fans and locks.
 - Selection by kind of entity, by area, and entity patterns to include or
   exclude.
-- Locks, garage doors and gates read-only unless their commands are allowed
-  in the configuration.
+- Locks, garage doors, gates and doors read-only, and alarm panels never
+  disarmed, unless their commands are allowed in the configuration.
 - Scene triggers: a Home Assistant event of a listed type, the state change of
   a watched entity.
 - Scene actions: call a Home Assistant service, run a script, activate a

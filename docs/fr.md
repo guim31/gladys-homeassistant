@@ -71,9 +71,7 @@ vous voyez s'ils sont verrouillés, ouverts ou fermés, mais ni un appareil, ni
 une scène, ni un assistant vocal relié à Gladys ne peut les ouvrir. Cochez
 **Autoriser les commandes des serrures, portes de garage et portails** pour les
 piloter (puis cliquez sur « Mettre à jour » sur ces appareils dans l'onglet
-Découverte). Les alarmes ne sont jamais importées ; l'action de scène qui
-appelle un service Home Assistant refuse `lock.*` et `alarm_control_panel.*`
-tant que cette case n'est pas cochée.
+Découverte). Les alarmes ne sont jamais importées ; l'action de scène qui appelle un service Home Assistant refuse toute commande sur eux, sur les alarmes et sur tous les volets à la fois (`all`, une pièce, un appareil) tant que cette case n'est pas cochée.
 
 ### Options
 
@@ -190,6 +188,10 @@ journaux de l'intégration (Gladys, page de l'intégration) donnent le détail.
 - Les noms des fonctionnalités sont fixés à l'ajout de l'appareil dans Gladys :
   un nom changé ensuite dans Home Assistant apparaît dans le nom proposé dans
   Découverte, pas dans l'appareil déjà ajouté.
+- Les identifiants dépendent du jeton : celui d'un administrateur donne un
+  appareil Gladys par appareil Home Assistant, un autre un appareil par entité.
+  Passer de l'un à l'autre propose à nouveau les appareils dans Découverte :
+  gardez le même type de jeton.
 - Les événements de scène sont limités à 120 par minute : un type d'événement
   très bavard est coupé au-delà, avec une ligne dans les journaux.
 

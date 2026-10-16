@@ -68,9 +68,7 @@ usted ve si están bloqueadas, abiertas o cerradas, pero ni un dispositivo, ni
 una escena, ni un asistente de voz vinculado a Gladys puede abrirlas. Marque
 **Permitir comandos de cerraduras, puertas de garaje y portones** para
 controlarlas (y luego pulse «Actualizar» en estos dispositivos en la pestaña
-Descubrir). Las alarmas nunca se importan; la acción de escena que llama a un
-servicio de Home Assistant rechaza `lock.*` y `alarm_control_panel.*` mientras
-esta casilla no esté marcada.
+Descubrir). Las alarmas nunca se importan; la acción de escena que llama a un servicio de Home Assistant rechaza cualquier comando sobre ellos, sobre las alarmas y sobre todas las persianas a la vez (`all`, un área, un dispositivo) mientras esta casilla no esté marcada.
 
 ### Opciones
 
@@ -188,6 +186,10 @@ detalles.
 - Los nombres de las funciones se fijan al añadir el dispositivo en Gladys: un
   nombre cambiado después en Home Assistant aparece en el nombre ofrecido en
   Descubrir, no en el dispositivo ya añadido.
+- Los identificadores dependen del token: el de un administrador da un
+  dispositivo de Gladys por dispositivo de Home Assistant, otro un dispositivo
+  por entidad. Cambiar de uno a otro vuelve a ofrecer los dispositivos en
+  Descubrir: mantenga el mismo tipo de token.
 - Los eventos de escena están limitados a 120 por minuto: un tipo de evento muy
   frecuente se corta por encima, con una línea en los registros.
 

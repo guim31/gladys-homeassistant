@@ -19,6 +19,9 @@ import { EventEmitter } from 'node:events';
 export const SOCKET_TIMINGS = {
   connectTimeout: 15_000,
   commandTimeout: 20_000,
+  // call_service waits for the end of the service (a script called as a service):
+  // just under the 30 s the scene actions are given.
+  serviceTimeout: 28_000,
   pingInterval: 30_000,
   pingTimeout: 10_000,
 };
@@ -148,15 +151,16 @@ export class HaSocket extends EventEmitter {
    * One command; resolves with its `result`, rejects with HaCommandError.
    * @param {string} type
    * @param {object} [payload]
+   * @param {number} [timeout] ms
    */
-  call(type, payload = {}) {
+  call(type, payload = {}, timeout = this.timings.commandTimeout) {
     return new Promise((resolve, reject) => {
       const id = this.nextId;
       this.nextId += 1;
       const timer = this.timers.setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Home Assistant did not answer ${type} in time`));
-      }, this.timings.commandTimeout);
+      }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.send({ ...payload, id, type });

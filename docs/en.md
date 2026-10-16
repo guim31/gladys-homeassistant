@@ -61,9 +61,7 @@ gate or door** are **read-only** in Gladys: you see whether they are locked,
 open or closed, but neither a device, nor a scene, nor a voice assistant
 linked to Gladys can open them. Tick **Allow commands of locks, garage doors
 and gates** to control them (then click "Update" on these devices in the
-Discovery tab). Alarm panels are never imported; the scene action that calls a
-Home Assistant service refuses `lock.*` and `alarm_control_panel.*` while this
-box is not ticked.
+Discovery tab). Alarm panels are never imported; the scene action that calls a Home Assistant service refuses any command on them, on alarm panels and on every cover at once (`all`, an area, a device) while this box is not ticked.
 
 ### Options
 
@@ -174,6 +172,10 @@ give the details.
 - The names of the features are set when a device is added in Gladys: a name
   changed later in Home Assistant shows in the device name proposed in
   Discovery, not in the device already added.
+- The external ids depend on the token: one from an administrator gives one
+  Gladys device per Home Assistant device, another one a device per entity.
+  Changing from one to the other offers the devices again in Discovery: keep
+  the same kind of token.
 - Scene events are limited to 120 per minute: a very chatty event type is cut
   beyond, with one line in the logs.
 

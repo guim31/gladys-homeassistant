@@ -31,6 +31,8 @@ export const BRIDGE_TIMINGS = {
   reconnectMax: 60_000,
   authRetry: 5 * 60_000,
   inventoryDebounce: 3000,
+  // Home Assistant still starting: its inventory is read again after this delay.
+  startingRetry: 10_000,
   refreshInterval: 60 * 60_000,
 };
 
@@ -39,6 +41,9 @@ export const WIDGET_KEY = 'status';
 
 /** Scene events per minute: the core takes 300, a chatty event type must not spend them all. */
 export const EVENTS_PER_MINUTE = 120;
+
+/** The core refuses a discovered list longer than this (setDiscoveredDevices, 5.2.0). */
+export const MAX_DISCOVERED_DEVICES = 2000;
 
 const REGISTRY_EVENTS = [
   'entity_registry_updated',
@@ -116,7 +121,12 @@ export class Bridge {
     this.delay = this.timings.reconnectMin;
     this.publisher.start();
     this.timers.clearInterval(this.refreshTimer);
-    this.refreshTimer = this.timers.setInterval(() => this.pushAll(), this.timings.refreshInterval);
+    // Hourly, the values again (the heartbeat keeps them dated): never a frozen value while offline.
+    this.refreshTimer = this.timers.setInterval(() => {
+      if (this.status === 'online') {
+        this.pushAll();
+      }
+    }, this.timings.refreshInterval);
     if (this.config.invalidUrl || !this.config.url || !this.config.token) {
       this.status = this.config.invalidUrl ? 'invalid_url' : 'not_configured';
       await this.setConnectionStatus(false, STATUS[this.status]);
@@ -176,10 +186,10 @@ export class Bridge {
         return;
       }
       this.socket = socket;
-      socket.on('close', () => this.onLost(generation));
-      await this.loadInventory(socket);
+      // Subscribed before get_states: no change is lost between the snapshot and the events.
       await socket.subscribeEvents('state_changed', (event) => this.onStateChanged(event));
-      for (const type of REGISTRY_EVENTS) {
+      await this.loadInventory(socket);
+      for (const type of [...REGISTRY_EVENTS, 'homeassistant_started']) {
         await socket
           .subscribeEvents(type, () => this.scheduleInventory())
           .catch((err) =>
@@ -193,12 +203,16 @@ export class Bridge {
             this.logger.warn(`Home Assistant refused the "${type}" events: ${err.message}`),
           );
       }
+      // The loss of the link is watched from here on; a loss during the load failed a call above.
+      if (socket.closed) {
+        throw new Error('connection lost');
+      }
+      socket.on('close', () => this.onLost(generation));
     } catch (err) {
       if (generation !== this.generation) {
         return;
       }
       if (this.socket === socket) {
-        socket.removeAllListeners('close');
         this.socket = undefined;
       }
       socket.close();
@@ -263,7 +277,8 @@ export class Bridge {
     // The registries are admin commands: without them, one device per entity, no areas.
     const registry = (type) =>
       socket.call(type).catch((err) => {
-        if (err instanceof HaCommandError) {
+        // Only a refusal for rights: any other error must not change every external id.
+        if (err instanceof HaCommandError && err.code === 'unauthorized') {
           this.limited = true;
           return [];
         }
@@ -277,13 +292,36 @@ export class Bridge {
       registry('config/device_registry/list'),
       registry('config/area_registry/list'),
     ]);
-    if (this.limited) {
+    const starting = config?.state && config.state !== 'RUNNING';
+    if (starting && this.snapshot?.states?.length) {
+      // Restarting: its entities are not all loaded yet. The previous inventory stays
+      // (no empty Discovery, commands still routed) until homeassistant_started or a retry.
+      for (const state of states ?? []) {
+        this.states.set(state.entity_id, state);
+      }
+      this.scheduleInventory(this.timings.startingRetry);
+      return;
+    }
+    if (starting) {
+      this.scheduleInventory(this.timings.startingRetry);
+    }
+    if (this.limited && !this.limitedWarned) {
+      this.limitedWarned = true;
       this.logger.warn(
         'The token is not an administrator one: devices and areas of Home Assistant are not read',
       );
     }
     this.snapshot = { config, states, entities, devices, areas };
-    this.states = new Map((states ?? []).map((s) => [s.entity_id, s]));
+    // A state_changed received while the snapshot was read is newer: it is kept.
+    const merged = new Map();
+    for (const state of states ?? []) {
+      const live = this.states.get(state.entity_id);
+      merged.set(
+        state.entity_id,
+        live && String(live.last_updated ?? '') > String(state.last_updated ?? '') ? live : state,
+      );
+    }
+    this.states = merged;
     await this.rebuild();
   }
 
@@ -293,6 +331,7 @@ export class Bridge {
       externalIds: this.gladys.externalIds.bind(this.gladys),
     });
     this.watched = matcher(this.config.watched);
+    this.included = matcher(this.config.include);
     await this.publishDevices();
     this.pushAll();
   }
@@ -301,14 +340,22 @@ export class Bridge {
     if (!this.gladys.connected) {
       return;
     }
+    let devices = this.inventory.devices;
+    if (devices.length > MAX_DISCOVERED_DEVICES) {
+      // The core refuses the whole list beyond it: the first ones are offered.
+      this.logger.warn(
+        `${devices.length} devices: only the first ${MAX_DISCOVERED_DEVICES} are offered, narrow the selection`,
+      );
+      devices = devices.slice(0, MAX_DISCOVERED_DEVICES);
+    }
     try {
-      await this.gladys.publishDiscoveredDevices(this.inventory.devices);
+      await this.gladys.publishDiscoveredDevices(devices);
     } catch (err) {
       this.logger.warn(`Publishing the discovered devices failed: ${err.message}`);
     }
   }
 
-  scheduleInventory() {
+  scheduleInventory(delay = this.timings.inventoryDebounce) {
     this.timers.clearTimeout(this.inventoryTimer);
     const generation = this.generation;
     this.inventoryTimer = this.timers.setTimeout(() => {
@@ -321,7 +368,7 @@ export class Bridge {
         .catch((err) =>
           this.logger.warn(`Reading the Home Assistant inventory failed: ${err.message}`),
         );
-    }, this.timings.inventoryDebounce);
+    }, delay);
   }
 
   /** Scan button, widget "Reload": the inventory now. */
@@ -387,7 +434,10 @@ export class Bridge {
       return;
     }
     this.states.set(entityId, next);
-    if (!previous && this.config.domains.includes(domainOf(entityId))) {
+    if (
+      !previous &&
+      (this.config.domains.includes(domainOf(entityId)) || this.included?.(entityId))
+    ) {
       // A new entity: the inventory may change.
       this.scheduleInventory();
     }
@@ -503,12 +553,16 @@ export class Bridge {
       throw this.error('offline');
     }
     try {
-      await this.socket.call('call_service', {
-        domain,
-        service,
-        service_data: data,
-        ...(entityId ? { target: { entity_id: entityId } } : {}),
-      });
+      await this.socket.call(
+        'call_service',
+        {
+          domain,
+          service,
+          service_data: data,
+          ...(entityId ? { target: { entity_id: entityId } } : {}),
+        },
+        this.socket.timings.serviceTimeout,
+      );
     } catch (err) {
       throw this.error('refused', err.message);
     }
@@ -542,7 +596,10 @@ export class Bridge {
   }
 
   /** Locks, and covers that open a garage, a gate or a door. */
-  isSecurityEntity(entityId) {
+  isSecurityEntity(raw) {
+    const entityId = String(raw ?? '')
+      .trim()
+      .toLowerCase();
     const domain = domainOf(entityId);
     if (domain === 'lock' || domain === 'alarm_control_panel') {
       return true;

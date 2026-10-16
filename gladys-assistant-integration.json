@@ -101,7 +101,12 @@
       "options": [
         {
           "value": "light",
-          "label": { "en": "Lights", "fr": "Lampes", "de": "Lampen", "es": "Luces" }
+          "label": {
+            "en": "Lights",
+            "fr": "Lampes",
+            "de": "Lampen",
+            "es": "Luces"
+          }
         },
         {
           "value": "switch",
@@ -141,7 +146,12 @@
         },
         {
           "value": "sensor",
-          "label": { "en": "Sensors", "fr": "Capteurs", "de": "Sensoren", "es": "Sensores" }
+          "label": {
+            "en": "Sensors",
+            "fr": "Capteurs",
+            "de": "Sensoren",
+            "es": "Sensores"
+          }
         },
         {
           "value": "binary_sensor",
@@ -172,7 +182,12 @@
         },
         {
           "value": "lock",
-          "label": { "en": "Locks", "fr": "Serrures", "de": "Schlösser", "es": "Cerraduras" }
+          "label": {
+            "en": "Locks",
+            "fr": "Serrures",
+            "de": "Schlösser",
+            "es": "Cerraduras"
+          }
         }
       ]
     },
@@ -258,10 +273,10 @@
         "es": "Permitir comandos de cerraduras, puertas de garaje y portones"
       },
       "description": {
-        "en": "Off: their state is shown, but Gladys cannot open them, from a device, a scene or a voice assistant.",
-        "fr": "Désactivé : leur état est affiché, mais Gladys ne peut pas les ouvrir, ni depuis un appareil, ni par une scène, ni par un assistant vocal.",
-        "de": "Aus: Der Zustand wird angezeigt, aber Gladys kann sie nicht öffnen, weder über ein Gerät noch eine Szene oder einen Sprachassistenten.",
-        "es": "Desactivado: se muestra su estado, pero Gladys no puede abrirlos, ni desde un dispositivo, ni con una escena, ni con un asistente de voz."
+        "en": "Off: locks, garage doors, gates and doors show their state, but Gladys cannot open them, nor disarm an alarm, from a device, a scene or a voice assistant.",
+        "fr": "Désactivé : serrures, portes de garage, portails et portes affichent leur état, mais Gladys ne peut ni les ouvrir ni désarmer une alarme, depuis un appareil, une scène ou un assistant vocal.",
+        "de": "Aus: Schlösser, Garagentore, Tore und Türen zeigen ihren Zustand, aber Gladys kann sie weder öffnen noch eine Alarmanlage entschärfen, über Gerät, Szene oder Sprachassistent.",
+        "es": "Desactivado: cerraduras, puertas de garaje, portones y puertas muestran su estado, pero Gladys no puede abrirlos ni desarmar una alarma, desde un dispositivo, una escena o un asistente de voz."
       },
       "required": false,
       "default": false
@@ -364,19 +379,39 @@
       "options": [
         {
           "value": "en",
-          "label": { "en": "English", "fr": "Anglais", "de": "Englisch", "es": "Inglés" }
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
         },
         {
           "value": "fr",
-          "label": { "en": "French", "fr": "Français", "de": "Französisch", "es": "Francés" }
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
         },
         {
           "value": "de",
-          "label": { "en": "German", "fr": "Allemand", "de": "Deutsch", "es": "Alemán" }
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
         },
         {
           "value": "es",
-          "label": { "en": "Spanish", "fr": "Espagnol", "de": "Spanisch", "es": "Español" }
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
         }
       ]
     }
@@ -444,7 +479,12 @@
         {
           "key": "entity_id",
           "type": "string",
-          "label": { "en": "Entity", "fr": "Entité", "de": "Entität", "es": "Entidad" }
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
         },
         {
           "key": "data",
@@ -476,7 +516,12 @@
         {
           "key": "entity_id",
           "type": "string",
-          "label": { "en": "Entity", "fr": "Entité", "de": "Entität", "es": "Entidad" }
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
         },
         {
           "key": "state",
@@ -493,12 +538,22 @@
         {
           "key": "entity_id",
           "type": "string",
-          "label": { "en": "Entity", "fr": "Entité", "de": "Entität", "es": "Entidad" }
+          "label": {
+            "en": "Entity",
+            "fr": "Entité",
+            "de": "Entität",
+            "es": "Entidad"
+          }
         },
         {
           "key": "name",
           "type": "string",
-          "label": { "en": "Name", "fr": "Nom", "de": "Name", "es": "Nombre" }
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          }
         },
         {
           "key": "state",
@@ -610,7 +665,12 @@
         {
           "key": "script",
           "type": "string",
-          "label": { "en": "Script", "fr": "Script", "de": "Skript", "es": "Script" },
+          "label": {
+            "en": "Script",
+            "fr": "Script",
+            "de": "Skript",
+            "es": "Script"
+          },
           "placeholder": {
             "en": "script.good_night",
             "fr": "script.good_night",
@@ -650,7 +710,12 @@
         {
           "key": "scene",
           "type": "string",
-          "label": { "en": "Scene", "fr": "Scène", "de": "Szene", "es": "Escena" },
+          "label": {
+            "en": "Scene",
+            "fr": "Scène",
+            "de": "Szene",
+            "es": "Escena"
+          },
           "placeholder": {
             "en": "scene.movie_time",
             "fr": "scene.movie_time",
@@ -680,7 +745,12 @@
         {
           "key": "button",
           "type": "string",
-          "label": { "en": "Button", "fr": "Bouton", "de": "Taste", "es": "Botón" },
+          "label": {
+            "en": "Button",
+            "fr": "Bouton",
+            "de": "Taste",
+            "es": "Botón"
+          },
           "placeholder": {
             "en": "button.restart_router",
             "fr": "button.restart_router",
