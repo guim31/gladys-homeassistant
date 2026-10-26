@@ -291,8 +291,9 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   Cast inactif perd PAUSE, PLAY, NEXT… `supported_options` de `playback` suit le bit STOP (le cœur
   les synchronise sans « Mettre à jour »).
 - **Plusieurs `media_player` sur un appareil HA** (Android TV + Cast fusionnés) : le widget Musique
-  indexe les fonctionnalités par type, donc un seul lecteur porte les fonctionnalités 1.1 : celui
-  de plus petit id de registre ; les autres gardent exactement leurs fonctionnalités 1.0 (lues par
+  indexe les fonctionnalités par type, donc un seul lecteur porte les fonctionnalités 1.1 : parmi
+  les lecteurs sélectionnés (mêmes filtres que l'inventaire : masqué, exclu, pièce), celui qui les a
+  déjà dans Gladys, sinon celui de plus petit id de registre ; les autres gardent exactement leurs fonctionnalités 1.0 (lues par
   le publieur d'états). Le catalogue vise ce lecteur seul. `pushAll` parcourt les routes **et** les
   lecteurs (un lecteur sans `power` n'a aucune route).
 - **Délai** : une écriture `media_player` attend 4,5 s au plus (Gladys coupe un set-value à 5 s) ; les
@@ -309,7 +310,7 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   `artwork-resize.js`.
 - **Catalogue** : `media_player/browse_media` rend tout un niveau (pagination faite ici, réponse
   gardée 60 s pour « Charger plus ») ; id d'un MediaItem `["<media_content_type>","<media_content_id>"]`
-  (haché et retenu en mémoire au-delà de 512). `media_player/search_media` répond `{ result: [...] }`.
+  (haché au-delà de 512, table dans `/data/media-ids.json`, écrite à part puis renommée). `media_player/search_media` répond `{ result: [...] }`.
   `play_media` avec `enqueue` sur un lecteur sans `MEDIA_ENQUEUE` est **accepté en silence** (il
   remplace) : « à la suite » / « en fin de file » sont refusés ici. Pas de file standard → pas de
   `queue`. Mode `replace` : pas d'`enqueue` (le défaut de chaque intégration, « lire maintenant »).

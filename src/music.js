@@ -17,7 +17,7 @@
 // -----------------------------------------------------------------------------
 
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { MAX_MEDIA_SECONDS, REPEAT_TO_GLADYS, playbackOf } from './mapping.js';
 
 /** The core drops a MediaItem whose id is longer. */
@@ -170,7 +170,9 @@ export class MediaIds {
       return;
     }
     try {
-      writeFileSync(this.file, JSON.stringify([...this.long]));
+      // Written aside then renamed: a stop in the middle never leaves a truncated table.
+      writeFileSync(`${this.file}.tmp`, JSON.stringify([...this.long]));
+      renameSync(`${this.file}.tmp`, this.file);
     } catch {
       // /data unavailable: the ids live until the next restart
     }
@@ -196,7 +198,13 @@ export class MediaIds {
 
   /** @returns {{ type: string, id: string } | null} */
   decode(mediaId) {
-    const raw = typeof mediaId === 'string' ? (this.long.get(mediaId) ?? mediaId) : '';
+    const known = typeof mediaId === 'string' ? this.long.get(mediaId) : undefined;
+    if (known !== undefined) {
+      // Used again (a scene): the most recent, the last one evicted.
+      this.long.delete(mediaId);
+      this.long.set(mediaId, known);
+    }
+    const raw = known ?? (typeof mediaId === 'string' ? mediaId : '');
     try {
       const pair = JSON.parse(raw);
       if (

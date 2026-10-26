@@ -601,3 +601,31 @@ test('long media ids are kept in /data for the scenes', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the player of a device: a hidden one is not chosen, the one already added stays', async (t) => {
+  const { buildInventory } = await import('../src/inventory.js');
+  const data = twoPlayersOneDevice();
+  const ids = (type, id) => ({
+    device: `ext:x:${type}:${id}`,
+    feature: (key) => `ext:x:${type}:${id}:${key}`,
+  });
+  const build = (snapshot, existing) =>
+    buildInventory(snapshot, {
+      externalIds: ids,
+      domains: ['media_player'],
+      existing,
+    });
+  const music = (inventory) =>
+    [...inventory.players]
+      .filter(([, player]) => player.deviceId === 'ext:x:device:dev-speaker')
+      .map(([entityId]) => entityId);
+  assert.deepEqual(music(build(data)), ['media_player.kitchen']);
+  // The kitchen (smallest id) hidden: the walkman carries the music.
+  const hidden = structuredClone(data);
+  hidden.entities.find((e) => e.id === 'a-kitchen').hidden_by = 'user';
+  assert.deepEqual(music(build(hidden)), ['media_player.walkman']);
+  // Added in Gladys as the player: it stays so when a smaller id shows up.
+  const existing = new Set(['ext:x:device:dev-speaker:b-walkman-title']);
+  assert.deepEqual(music(build(data, existing)), ['media_player.walkman']);
+  t.diagnostic('primary player chosen');
+});
