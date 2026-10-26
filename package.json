@@ -1,6 +1,6 @@
 {
   "name": "gladys-homeassistant",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "Gladys Assistant external integration bridging Home Assistant: import its entities into Gladys and control them through the WebSocket API.",
   "type": "module",
