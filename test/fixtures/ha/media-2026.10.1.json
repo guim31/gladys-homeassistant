@@ -1,0 +1,191 @@
+{
+  "source": "Home Assistant 2026.10.1, demo integration + a local media folder (media_dirs local: Albums/Bench), WebSocket answers of media_player/browse_media and media_player/search_media, 2026-10-26",
+  "browse_root": {
+    "title": "Media sources",
+    "media_class": "app",
+    "media_content_type": "apps",
+    "media_content_id": "media-source://",
+    "children_media_class": "app",
+    "can_play": false,
+    "can_expand": true,
+    "can_search": false,
+    "search_media_classes": null,
+    "thumbnail": null,
+    "not_shown": 0,
+    "children": [
+      {
+        "title": "AI generated images",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://ai_task",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/ai_task/logo.png"
+      },
+      {
+        "title": "Camera",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://camera",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/camera/logo.png"
+      },
+      {
+        "title": "Image",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://image",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/image/logo.png"
+      },
+      {
+        "title": "Image upload",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://image_upload",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/image_upload/logo.png"
+      },
+      {
+        "title": "My media",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://media_source",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/media_source/logo.png"
+      },
+      {
+        "title": "Text-to-speech",
+        "media_class": "app",
+        "media_content_type": "app",
+        "media_content_id": "media-source://tts",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": "/api/brands/integration/tts/logo.png"
+      }
+    ]
+  },
+  "browse_media_source": {
+    "title": "media",
+    "media_class": "directory",
+    "media_content_type": "",
+    "media_content_id": "media-source://media_source/local/.",
+    "children_media_class": "directory",
+    "can_play": false,
+    "can_expand": true,
+    "can_search": true,
+    "search_media_classes": null,
+    "thumbnail": null,
+    "not_shown": 0,
+    "children": [
+      {
+        "title": "Albums",
+        "media_class": "directory",
+        "media_content_type": "",
+        "media_content_id": "media-source://media_source/local/Albums",
+        "children_media_class": null,
+        "can_play": false,
+        "can_expand": true,
+        "can_search": true,
+        "search_media_classes": null,
+        "thumbnail": null
+      }
+    ]
+  },
+  "browse_bench": {
+    "title": "Bench",
+    "media_class": "directory",
+    "media_content_type": "",
+    "media_content_id": "media-source://media_source/local/Albums/Bench",
+    "children_media_class": "directory",
+    "can_play": false,
+    "can_expand": true,
+    "can_search": true,
+    "search_media_classes": null,
+    "thumbnail": null,
+    "not_shown": 0,
+    "children": [
+      {
+        "title": "01 - First.mp3",
+        "media_class": "music",
+        "media_content_type": "audio/mpeg",
+        "media_content_id": "media-source://media_source/local/Albums/Bench/01 - First.mp3",
+        "children_media_class": null,
+        "can_play": true,
+        "can_expand": false,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": null
+      },
+      {
+        "title": "cover.png",
+        "media_class": "image",
+        "media_content_type": "image/png",
+        "media_content_id": "media-source://media_source/local/Albums/Bench/cover.png",
+        "children_media_class": null,
+        "can_play": true,
+        "can_expand": false,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": null
+      }
+    ]
+  },
+  "search_hip": {
+    "result": [
+      {
+        "title": "Search result",
+        "media_class": "movie",
+        "media_content_type": "movie",
+        "media_content_id": "search_result_id",
+        "children_media_class": null,
+        "can_play": true,
+        "can_expand": false,
+        "can_search": false,
+        "search_media_classes": null,
+        "thumbnail": null,
+        "not_shown": 0,
+        "children": []
+      }
+    ]
+  },
+  "search_unsupported": {
+    "error": {
+      "code": "home_assistant_error",
+      "message": "Search is not supported for media with content ID None",
+      "translation_key": "search_not_supported",
+      "translation_placeholders": {
+        "media_content_id": "None"
+      },
+      "translation_domain": "media_source"
+    }
+  },
+  "browse_unsupported": {
+    "error": {
+      "code": "not_supported",
+      "message": "Player does not support browsing media"
+    }
+  }
+}

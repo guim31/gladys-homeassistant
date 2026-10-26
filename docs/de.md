@@ -16,6 +16,7 @@ Assistant oder Nabu Casa verbunden.
 
 ## Voraussetzungen
 
+- Gladys 5.3 oder neuer.
 - Ein aktuelles Home Assistant (getestet mit 2026.10), von der Gladys-Maschine
   aus erreichbar (gleiches Netzwerk oder VPN).
 - Ein **langlebiges Zugriffstoken**, am besten von einem
@@ -93,22 +94,22 @@ Entitäten; eine Entität ohne Gerät (ein Helfer, eine Vorlage) ist ein eigenes
 Gerät. Der Name ist der aus Home Assistant, mit seinem Bereich („Decke
 (Wohnzimmer)“).
 
-| Home Assistant                                          | In Gladys                                                                |
-| ------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `light`                                                 | Ein/Aus, Helligkeit, Farbe, Farbtemperatur (falls unterstützt)           |
-| `switch`, `input_boolean`                               | ein Schalter                                                             |
-| `cover`                                                 | ein Rollladen (oder Vorhang): öffnen, schließen, stoppen, Position       |
-| `cover` Garagentor, Tor, Tür                            | offen oder geschlossen (schreibgeschützt, sofern nicht erlaubt)          |
-| `climate`                                               | Solltemperatur, Modus (aus, heizen, kühlen, auto), Raumtemperatur        |
-| `sensor` nach Geräteklasse                              | Temperatur, Feuchtigkeit, Druck, Helligkeit, CO2, PM2,5, PM10            |
-|                                                         | Leistung, Energie (Zählerstand), Spannung, Strom, Batterie, Gas, Wasser  |
-|                                                         | Lärm, Windgeschwindigkeit, Entfernung, Dauer, Regenintensität, AQI       |
-| `binary_sensor` Tür, Fenster, Garagentor, Öffnung       | ein Öffnungsmelder                                                       |
-| `binary_sensor` Bewegung, Belegung, Anwesenheit         | ein Bewegungs- oder Anwesenheitsmelder                                   |
-| `binary_sensor` Rauch, Feuchtigkeit, CO, Sabotage, usw. | Rauch-, Wasser-, CO-, Sabotagemelder; sonst ein allgemeiner Eingang      |
-| `media_player`                                          | Ein/Aus, Wiedergabe, Pause, weiter, zurück, Lautstärke, Wiedergabestatus |
-| `fan`                                                   | Ein/Aus, Geschwindigkeit in %                                            |
-| `lock`                                                  | verriegelt oder nicht (schreibgeschützt, sofern nicht erlaubt)           |
+| Home Assistant                                          | In Gladys                                                               |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `light`                                                 | Ein/Aus, Helligkeit, Farbe, Farbtemperatur (falls unterstützt)          |
+| `switch`, `input_boolean`                               | ein Schalter                                                            |
+| `cover`                                                 | ein Rollladen (oder Vorhang): öffnen, schließen, stoppen, Position      |
+| `cover` Garagentor, Tor, Tür                            | offen oder geschlossen (schreibgeschützt, sofern nicht erlaubt)         |
+| `climate`                                               | Solltemperatur, Modus (aus, heizen, kühlen, auto), Raumtemperatur       |
+| `sensor` nach Geräteklasse                              | Temperatur, Feuchtigkeit, Druck, Helligkeit, CO2, PM2,5, PM10           |
+|                                                         | Leistung, Energie (Zählerstand), Spannung, Strom, Batterie, Gas, Wasser |
+|                                                         | Lärm, Windgeschwindigkeit, Entfernung, Dauer, Regenintensität, AQI      |
+| `binary_sensor` Tür, Fenster, Garagentor, Öffnung       | ein Öffnungsmelder                                                      |
+| `binary_sensor` Bewegung, Belegung, Anwesenheit         | ein Bewegungs- oder Anwesenheitsmelder                                  |
+| `binary_sensor` Rauch, Feuchtigkeit, CO, Sabotage, usw. | Rauch-, Wasser-, CO-, Sabotagemelder; sonst ein allgemeiner Eingang     |
+| `media_player`                                          | ein Musik-Player (siehe unten) und Ein/Aus                              |
+| `fan`                                                   | Ein/Aus, Geschwindigkeit in %                                           |
+| `lock`                                                  | verriegelt oder nicht (schreibgeschützt, sofern nicht erlaubt)          |
 
 Die **Solltemperatur** eines Thermostats bleibt innerhalb der Grenzen, die Home
 Assistant dafür angibt (`min_temp`, `max_temp`): Ein Wert außerhalb wird
@@ -116,6 +117,38 @@ abgelehnt, nie in einen anderen umgewandelt. Ein Thermostat, das nur einen
 Bereich annimmt (heat_cool), zeigt Modus und Temperatur, keine
 Solltemperatur. Eine Farblampe zeigt im Farbmodus ihre Farbe und im Weißmodus
 ihre Farbtemperatur.
+
+### Musik-Player von Gladys 5.3
+
+Jeder `media_player` von Home Assistant wird ein echter Player im
+**Musik**-Widget von Gladys: Cover, Titel, Interpret, Album,
+Fortschrittsbalken, Wiedergabe / Pause / Stopp, zurück / weiter, Springen im
+Titel, Zufallswiedergabe, Wiederholen, Stummschaltung und Lautstärke, soweit
+der Player sie in Home Assistant erlaubt. Der Knopf des Widgets öffnet ein
+Panel:
+
+- **Durchsuchen**: die Medienquellen von Home Assistant (deine Medien, Radios,
+  Bibliotheken der Integrationen…), wie in seinem Medienbrowser;
+- **Suchen**: für Player mit Suche in Home Assistant (ab 2025.2, zum Beispiel
+  Music Assistant);
+- **Abspielen**, und **Als Nächstes abspielen** / **Zur Warteschlange hinzufügen** für
+  Player mit Warteschlange in Home Assistant. Es gibt kein Panel
+  „Warteschlange“: Home Assistant hat keine einheitliche.
+
+Die Szenenaktion **Musik auf einem Lautsprecher abspielen** von Gladys startet eine Playlist, ein
+Album oder ein Radio aus diesem Panel. Kann ein Player etwas nicht (durchsuchen,
+suchen, ein Medium starten, springen, stoppen), lehnt er es mit einer klaren
+Meldung ab. Die Cover liest die Integration mit deinem Token und verkleinert sie
+bei Bedarf: Dein Browser kontaktiert Home Assistant nie. Vereint ein Gerät von Home
+Assistant mehrere Player (zum Beispiel Fernseher und Chromecast), wird nur einer
+zum Musik-Player; die anderen behalten die Steuerung der Version 1.0.
+
+**Mit Version 1.0 hinzugefügte Player**: Die neuen Funktionen kommen über den
+Reiter **Entdecken**: Klicke beim Gerät auf **Aktualisieren**. Sonst ändert
+sich nichts (Wiedergabe, Pause, weiter, zurück und Lautstärke behalten ihre
+IDs, Szenen und Dashboards funktionieren weiter). Ein Unterschied gleich nach
+dem Update der Integration: Ein gestoppter Player hat jetzt den
+Wiedergabestatus **Gestoppt** (2), nicht mehr **Pause** (0).
 
 ### Dashboard-Widget
 

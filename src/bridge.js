@@ -12,6 +12,9 @@
 //              removed -> the inventory is read again (debounced);
 //   commands   onSetValue -> call_service; Home Assistant's state_changed
 //              echo is the feedback;
+//   music      media players -> publishNowPlaying (src/music.js); browse_media,
+//              search_media and play_media for the music panels of Gladys 5.3;
+//              artwork read with the long-lived token, made small enough;
 //   events     forward_events (event types) -> trigger `ha_event`;
 //              watched_entities -> trigger `entity_state_changed`;
 //   failures   connection lost -> unreachable badges, new attempt after 5 s,
@@ -22,7 +25,9 @@ import { DEVICE_TRANSPORTS } from '@gladysassistant/integration-sdk';
 import { matcher, normalizeConfig } from './config.js';
 import { HaAuthError, HaCommandError, HaSocket } from './ha/socket.js';
 import { buildInventory } from './inventory.js';
-import { SENSITIVE_COVERS, WriteError, domainOf } from './mapping.js';
+import { ArtworkError, prepareArtwork, readLimited } from './artwork-resize.js';
+import { MEDIA, SENSITIVE_COVERS, WriteError, domainOf, has } from './mapping.js';
+import { MediaIds, SEARCH_CLASSES, httpBase, nowPlayingOf, toMediaItem } from './music.js';
 import { StatePublisher } from './publisher.js';
 import { ERRORS, STATUS, localizedError, testMessage } from './texts.js';
 
@@ -34,7 +39,15 @@ export const BRIDGE_TIMINGS = {
   // Home Assistant still starting: its inventory is read again after this delay.
   startingRetry: 10_000,
   refreshInterval: 60 * 60_000,
+  // Gladys waits 10 s for a music answer, 15 s for an artwork.
+  musicTimeout: 8000,
+  setValueTimeout: 4500,
+  artworkTimeout: 10_000,
+  browseCache: 60_000,
 };
+
+/** Largest artwork read before resizing. */
+export const MAX_ARTWORK_DOWNLOAD = 10 * 1024 * 1024;
 
 export const TRIGGERS = { HA_EVENT: 'ha_event', ENTITY_CHANGED: 'entity_state_changed' };
 export const WIDGET_KEY = 'status';
@@ -66,7 +79,10 @@ export class Bridge {
     socketTimings,
     publisherTimings,
     now = Date.now,
+    fetch: fetchImpl = (...args) => globalThis.fetch(...args),
+    dataDir,
   }) {
+    this.fetch = fetchImpl;
     this.gladys = gladys;
     this.logger = logger;
     this.createSocket = createSocket;
@@ -99,6 +115,11 @@ export class Bridge {
     this.transports = new Map();
     this.eventWindow = [];
     this.eventsDropped = false;
+    this.mediaIds = new MediaIds({ file: dataDir ? `${dataDir}/media-ids.json` : undefined });
+    /** entity_id -> first sight of a position without its timestamp */
+    this.samples = new Map();
+    /** browse_media answers, for the "load more" pages: key -> { at, node } */
+    this.browseCache = new Map();
   }
 
   // --- Configuration and lifecycle -----------------------------------------------
@@ -329,6 +350,7 @@ export class Bridge {
     this.inventory = buildInventory(this.snapshot ?? {}, {
       ...this.config,
       externalIds: this.gladys.externalIds.bind(this.gladys),
+      existing: this.createdFeatures(),
     });
     this.watched = matcher(this.config.watched);
     this.included = matcher(this.config.include);
@@ -396,6 +418,9 @@ export class Bridge {
 
   pushEntity(entityId, created = this.createdFeatures()) {
     const state = this.states.get(entityId);
+    if (state && this.inventory.players.has(entityId)) {
+      this.publishPlayer(entityId, state, created);
+    }
     for (const route of this.inventory.routes.get(entityId) ?? []) {
       if (!state || !created.has(route.featureId)) {
         continue;
@@ -412,9 +437,48 @@ export class Bridge {
     }
   }
 
+  /** A media player: its music features through publishNowPlaying, the ones added in Gladys. */
+  publishPlayer(entityId, state, created) {
+    const player = this.inventory.players.get(entityId);
+    const snapshot = nowPlayingOf(state, {
+      now: this.now(),
+      base: httpBase(this.config.url),
+      samples: this.samples,
+    });
+    if (!snapshot || !this.gladys.connected) {
+      return;
+    }
+    const values = {};
+    const featureExternalIds = {};
+    for (const [key, value] of Object.entries(snapshot)) {
+      const featureId = player.features[key];
+      if (value !== undefined && featureId && created.has(featureId)) {
+        values[key] = value;
+        featureExternalIds[key === 'artwork_url' ? 'artwork' : key] = featureId;
+      }
+    }
+    if (Object.keys(values).length === 0) {
+      return;
+    }
+    this.gladys
+      .publishNowPlaying(player.snapshotId, values, { featureExternalIds })
+      .catch((err) => this.logger.debug(`Now playing of ${entityId} not sent: ${err.message}`));
+  }
+
+  /** Forget the now-playing snapshots of a device: the next states publish everything. */
+  forgetPlayers(deviceId) {
+    for (const player of this.inventory.players.values()) {
+      if (player.deviceId === deviceId) {
+        this.gladys.forgetPublishedStates(player.snapshotId);
+      }
+    }
+  }
+
   pushAll() {
     const created = this.createdFeatures();
-    for (const entityId of this.inventory.routes.keys()) {
+    // A media player without power has no route: its features are all now-playing ones.
+    const entities = new Set([...this.inventory.routes.keys(), ...this.inventory.players.keys()]);
+    for (const entityId of entities) {
       this.pushEntity(entityId, created);
     }
   }
@@ -441,7 +505,7 @@ export class Bridge {
       // A new entity: the inventory may change.
       this.scheduleInventory();
     }
-    if (this.inventory.routes.has(entityId)) {
+    if (this.inventory.routes.has(entityId) || this.inventory.players.has(entityId)) {
       this.pushEntity(entityId);
       if ((next.state === 'unavailable') !== (previous?.state === 'unavailable')) {
         this.publishTransports().catch(() => {});
@@ -514,6 +578,7 @@ export class Bridge {
   async onDeviceCreated(device) {
     // The SDK forgot the values of this device: they are sent again now.
     this.publisher.forget(device.external_id);
+    this.forgetPlayers(device.external_id);
     this.transports.delete(device.external_id);
     this.pushAll();
     await this.publishTransports();
@@ -522,6 +587,7 @@ export class Bridge {
 
   async onDeviceDeleted(device) {
     this.publisher.forget(device.external_id);
+    this.forgetPlayers(device.external_id);
     this.transports.delete(device.external_id);
     this.requestWidgetRefresh();
   }
@@ -548,7 +614,7 @@ export class Bridge {
    * @param {object} [data]
    * @param {string} [entityId]
    */
-  async callService(domain, service, data = {}, entityId) {
+  async callService(domain, service, data = {}, entityId, timeout) {
     if (this.status !== 'online' || !this.socket) {
       throw this.error('offline');
     }
@@ -561,7 +627,7 @@ export class Bridge {
           service_data: data,
           ...(entityId ? { target: { entity_id: entityId } } : {}),
         },
-        this.socket.timings.serviceTimeout,
+        timeout ?? this.socket.timings.serviceTimeout,
       );
     } catch (err) {
       throw this.error('refused', err.message);
@@ -592,7 +658,170 @@ export class Bridge {
       throw err;
     }
     this.logger.info(`Command: ${writer.domain}.${call.service} on ${writer.entityId}`);
-    await this.callService(writer.domain, call.service, call.data ?? {}, writer.entityId);
+    await this.callService(
+      writer.domain,
+      call.service,
+      call.data ?? {},
+      writer.entityId,
+      // Gladys gives a set-value 5 s: a player answers within, or the command is reported failed.
+      writer.domain === 'media_player' ? this.timings.setValueTimeout : undefined,
+    );
+  }
+
+  // --- Music players (Gladys 5.3) ----------------------------------------------
+
+  /** The media_player of a Gladys device able to do `bit`, or a localized refusal. */
+  playerEntity(device, bit, refusal) {
+    if (this.status !== 'online' || !this.socket) {
+      throw this.error('offline');
+    }
+    const entities = [];
+    for (const [entityId, player] of this.inventory.players) {
+      if (player.deviceId === device?.external_id) {
+        entities.push(entityId);
+      }
+    }
+    if (entities.length === 0) {
+      throw this.error('unknown_feature');
+    }
+    const available = entities.filter((id) =>
+      ['playing', 'paused', 'buffering', 'idle', 'on', 'off', 'standby'].includes(
+        this.states.get(id)?.state,
+      ),
+    );
+    if (available.length === 0) {
+      throw this.error('player_unavailable');
+    }
+    const entityId = available.find((id) => has(this.states.get(id), bit));
+    if (!entityId) {
+      throw this.error(refusal);
+    }
+    return entityId;
+  }
+
+  async musicCall(type, payload) {
+    try {
+      return await this.socket.call(type, payload, this.timings.musicTimeout);
+    } catch (err) {
+      throw this.error('refused', err.message);
+    }
+  }
+
+  mediaItem(node) {
+    return toMediaItem(node, {
+      ids: this.mediaIds,
+      artworkKey: (url) => this.gladys.artworkKey(url),
+      base: httpBase(this.config.url),
+    });
+  }
+
+  decodeMedia(id) {
+    const media = this.mediaIds.decode(id);
+    if (!media) {
+      throw this.error('media_unknown');
+    }
+    return media;
+  }
+
+  async musicBrowse(device, { parentId = null, offset = 0, limit = 50 } = {}) {
+    const entityId = this.playerEntity(device, MEDIA.BROWSE_MEDIA, 'browse_unsupported');
+    const payload = { entity_id: entityId };
+    if (parentId) {
+      const media = this.decodeMedia(parentId);
+      payload.media_content_type = media.type;
+      payload.media_content_id = media.id;
+    }
+    // Home Assistant answers a whole level: the next pages come from this answer.
+    const key = JSON.stringify(payload);
+    const now = this.now();
+    for (const [k, entry] of this.browseCache) {
+      if (now - entry.at > this.timings.browseCache) {
+        this.browseCache.delete(k);
+      }
+    }
+    let node = offset > 0 ? this.browseCache.get(key)?.node : undefined;
+    if (!node) {
+      node = await this.musicCall('media_player/browse_media', payload);
+      this.browseCache.delete(key);
+      this.browseCache.set(key, { at: now, node });
+      if (this.browseCache.size > 20) {
+        this.browseCache.delete(this.browseCache.keys().next().value);
+      }
+    }
+    const children = Array.isArray(node?.children) ? node.children : [];
+    return {
+      items: children.slice(offset, offset + limit).map((child) => this.mediaItem(child)),
+      total: children.length,
+    };
+  }
+
+  async musicSearch(device, { query, type = null, limit = 20 } = {}) {
+    const entityId = this.playerEntity(device, MEDIA.SEARCH_MEDIA, 'search_unsupported');
+    const answer = await this.musicCall('media_player/search_media', {
+      entity_id: entityId,
+      search_query: String(query ?? ''),
+      ...(type && SEARCH_CLASSES[type] ? { media_filter_classes: SEARCH_CLASSES[type] } : {}),
+    });
+    const results = Array.isArray(answer?.result) ? answer.result : [];
+    return { items: results.slice(0, limit).map((node) => this.mediaItem(node)) };
+  }
+
+  async musicPlay(device, media, mode = 'replace') {
+    const entityId = this.playerEntity(device, MEDIA.PLAY_MEDIA, 'play_media_unsupported');
+    const { type, id } = this.decodeMedia(media?.id);
+    const enqueue = { next: 'next', append: 'add' }[mode];
+    // Home Assistant ignores `enqueue` on a player without a queue: it would replace.
+    if (enqueue && !has(this.states.get(entityId) ?? {}, MEDIA.MEDIA_ENQUEUE)) {
+      throw this.error('enqueue_unsupported');
+    }
+    this.logger.info(`Command: media_player.play_media (${mode}) on ${entityId}`);
+    await this.callService(
+      'media_player',
+      'play_media',
+      { media_content_id: id, media_content_type: type, ...(enqueue ? { enqueue } : {}) },
+      entityId,
+      this.timings.musicTimeout,
+    );
+  }
+
+  /**
+   * onMusicGetArtwork: the image of a key, read with the long-lived token from
+   * Home Assistant (never sent elsewhere), made small enough for the core:
+   * the media player proxy serves the artwork at its original size.
+   */
+  async artwork(key) {
+    const url = this.gladys.artworkUrls.get(key);
+    if (url === undefined) {
+      throw new Error(`Unknown artwork ${key}`);
+    }
+    const base = httpBase(this.config.url);
+    // Home Assistant only, its path prefix included (another service may share the origin).
+    const own = Boolean(base) && url.startsWith(`${base}/`);
+    let response;
+    try {
+      response = await this.fetch(url, {
+        headers: own ? { authorization: `Bearer ${this.config.token}` } : {},
+        // The token must not follow a redirection.
+        redirect: own ? 'error' : 'follow',
+        signal: AbortSignal.timeout(this.timings.artworkTimeout),
+      });
+    } catch (err) {
+      throw new Error(`Artwork ${key}: ${err.message}`, { cause: err });
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw new Error(`Artwork ${key}: HTTP ${response.status}`);
+    }
+    try {
+      if (Number(response.headers.get('content-length')) > MAX_ARTWORK_DOWNLOAD) {
+        throw new ArtworkError('TOO_LARGE', 'Image larger than 10 MB');
+      }
+      const image = await prepareArtwork(await readLimited(response.body, MAX_ARTWORK_DOWNLOAD));
+      return image.toString('base64');
+    } catch (err) {
+      await response.body?.cancel().catch(() => {});
+      throw new Error(`Artwork ${key}: ${err.message}`, { cause: err });
+    }
   }
 
   /** Locks, and covers that open a garage, a gate or a door. */

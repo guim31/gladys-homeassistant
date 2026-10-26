@@ -10,7 +10,7 @@ import { widgets } from './widgets.js';
 
 /**
  * @param {import('@gladysassistant/integration-sdk').GladysIntegration} gladys
- * @param {object} [deps] test doubles: createSocket, timers, timings, socketTimings, publisherTimings, now, logger
+ * @param {object} [deps] test doubles: createSocket, timers, timings, socketTimings, publisherTimings, now, logger, fetch, dataDir
  */
 export function registerHandlers(gladys, deps = {}) {
   const logger = deps.logger ?? createLogger({ name: 'homeassistant' });
@@ -23,6 +23,10 @@ export function registerHandlers(gladys, deps = {}) {
   gladys.onDeviceUpdated((device) => bridge.onDeviceCreated(device));
   gladys.onDeviceDeleted((device) => bridge.onDeviceDeleted(device));
   gladys.onAction('test_connection', () => bridge.testConnection());
+  gladys.onMusicBrowse((device, query) => bridge.musicBrowse(device, query));
+  gladys.onMusicSearch((device, query) => bridge.musicSearch(device, query));
+  gladys.onMusicPlay((device, media, mode) => bridge.musicPlay(device, media, mode));
+  gladys.onMusicGetArtwork((key) => bridge.artwork(key));
 
   for (const [key, handler] of Object.entries(sceneActions(bridge))) {
     gladys.onSceneAction(key, async (fields) => {

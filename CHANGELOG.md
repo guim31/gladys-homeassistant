@@ -10,6 +10,33 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Added
+
+- Gladys 5.3 music player: every Home Assistant `media_player` becomes a full
+  player in the Gladys Music widget — artwork, title, artist, album, duration
+  and position (seek), shuffle, repeat, mute, volume, and a playback state you
+  can write (play, pause, stop) — as far as the player allows it in Home
+  Assistant; a refused command says why.
+- Music panel: browse the media sources of Home Assistant, search (Home
+  Assistant 2025.2 or later, players that support it), play, play next and add
+  to queue (players with a queue in Home Assistant), and the "Play music on a
+  speaker" scene action.
+- Artwork read with your access token and reduced to a JPEG of 400 px when it
+  is larger than what Gladys accepts.
+
+### Changed
+
+- Requires Gladys 5.3.0 or later.
+- A stopped, idle or switched-off player now reads **Stopped** (2) in its
+  playback state, no longer **Paused** (0): check the scenes that wait for 0.
+- Players added with 1.0: click **Update** on the device in the Discovery tab
+  to get the new features; play, pause, next, previous, volume and the
+  playback state keep their ids, so scenes and dashboards keep working. A
+  feature of an added player is no longer dropped when Home Assistant
+  temporarily stops announcing it (an idle Cast player). When one Home
+  Assistant device holds several players, only one becomes the Music player,
+  the others keep their 1.0 features.
+
 ## [1.0.1] - 2026-10-22
 
 ### Security

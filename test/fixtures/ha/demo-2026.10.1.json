@@ -994,7 +994,8 @@
         "sound_mode": "Music",
         "shuffle": false,
         "friendly_name": "Living Room",
-        "supported_features": 119695
+        "supported_features": 119695,
+        "entity_picture": "/api/media_player_proxy/media_player.living_room?token=0000000000000000000000000000000000000000000000000000000000000000&cache=bc2ffb49c4f67034"
       },
       "last_changed": "2026-10-16T03:43:08.692728+00:00",
       "last_reported": "2026-10-16T03:43:08.692728+00:00",
@@ -1017,7 +1018,8 @@
         "sound_mode": "Music",
         "shuffle": false,
         "friendly_name": "Bedroom",
-        "supported_features": 119695
+        "supported_features": 119695,
+        "entity_picture": "/api/media_player_proxy/media_player.bedroom?token=0000000000000000000000000000000000000000000000000000000000000000&cache=e4513ed94ec89151"
       },
       "last_changed": "2026-10-16T03:43:08.692850+00:00",
       "last_reported": "2026-10-16T03:43:08.692850+00:00",
@@ -1042,7 +1044,8 @@
         "shuffle": false,
         "repeat": "off",
         "friendly_name": "Walkman",
-        "supported_features": 914877
+        "supported_features": 914877,
+        "entity_picture": "/api/media_player_proxy/media_player.walkman?token=0000000000000000000000000000000000000000000000000000000000000000&cache=62c0c516acbc53a9"
       },
       "last_changed": "2026-10-16T03:43:08.692975+00:00",
       "last_reported": "2026-10-16T03:43:08.692975+00:00",
@@ -1067,7 +1070,8 @@
         "shuffle": false,
         "repeat": "off",
         "friendly_name": "Kitchen",
-        "supported_features": 914877
+        "supported_features": 914877,
+        "entity_picture": "/api/media_player_proxy/media_player.kitchen?token=0000000000000000000000000000000000000000000000000000000000000000&cache=62c0c516acbc53a9"
       },
       "last_changed": "2026-10-16T03:43:08.693076+00:00",
       "last_reported": "2026-10-16T03:43:08.693076+00:00",
@@ -1094,7 +1098,8 @@
         "shuffle": false,
         "device_class": "tv",
         "friendly_name": "Lounge room",
-        "supported_features": 121265
+        "supported_features": 121265,
+        "entity_picture": "/api/media_player_proxy/media_player.lounge_room?token=0000000000000000000000000000000000000000000000000000000000000000&cache=cb9d84451faf9351"
       },
       "last_changed": "2026-10-16T03:43:08.693204+00:00",
       "last_reported": "2026-10-16T03:43:08.693204+00:00",

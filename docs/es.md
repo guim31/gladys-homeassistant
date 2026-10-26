@@ -16,6 +16,7 @@ el proyecto Home Assistant ni con Nabu Casa.
 
 ## Requisitos
 
+- Gladys 5.3 o posterior.
 - Un Home Assistant reciente (probado con 2026.10), accesible desde la máquina
   de Gladys (misma red, o una VPN).
 - Un **token de acceso de larga duración**, preferiblemente de una cuenta de
@@ -103,7 +104,7 @@ plantilla) es un dispositivo aparte. El nombre es el de Home Assistant, con su
 | `binary_sensor` puerta, ventana, garaje, apertura | un detector de apertura                                                |
 | `binary_sensor` movimiento, ocupación, presencia  | un detector de movimiento o de presencia                               |
 | `binary_sensor` humo, humedad, CO, sabotaje, etc. | detectores de humo, fuga, CO, sabotaje; una entrada genérica si no     |
-| `media_player`                                    | encendido, reproducir, pausa, siguiente, anterior, volumen, estado     |
+| `media_player`                                    | un reproductor de Música (ver más abajo) y encendido/apagado           |
 | `fan`                                             | encendido/apagado, velocidad en %                                      |
 | `lock`                                            | bloqueada o no (solo lectura salvo permiso)                            |
 
@@ -112,6 +113,38 @@ Assistant indica para él (`min_temp`, `max_temp`): un valor fuera de ellos se
 rechaza, nunca se convierte en otro. Un termostato que solo acepta un rango
 (heat_cool) muestra su modo y su temperatura, sin consigna. Una luz de color
 muestra su color en modo color y su temperatura de color en modo blanco.
+
+### Reproductor de Música de Gladys 5.3
+
+Cada `media_player` de Home Assistant se convierte en un verdadero reproductor
+en el widget **Música** de Gladys: carátula, título, artista, álbum, barra de
+progreso, reproducir / pausa / detener, anterior / siguiente, desplazamiento en
+la pista, aleatorio, repetición, silencio y volumen, según lo que permita el
+reproductor en Home Assistant. El botón del widget abre un panel:
+
+- **Explorar**: las fuentes multimedia de Home Assistant (sus medios, radios,
+  bibliotecas de las integraciones…), como en su explorador de medios;
+- **Buscar**: para los reproductores con búsqueda en Home Assistant (2025.2 o
+  posterior, Music Assistant por ejemplo);
+- **Reproducir**, y **Reproducir a continuación** / **Añadir a la cola** para los
+  reproductores con cola en Home Assistant. No hay panel «Cola»: Home Assistant
+  no ofrece una estándar.
+
+La acción de escena **Reproducir música en un altavoz** de Gladys inicia una lista, un
+álbum o una radio elegidos en ese panel. Un reproductor que no sabe hacer algo
+(explorar, buscar, iniciar un contenido, desplazarse, detenerse) lo rechaza con
+un mensaje claro. La integración lee las carátulas con su token y las reduce si
+hace falta: su navegador nunca contacta con Home Assistant. Cuando un dispositivo de Home
+Assistant agrupa varios reproductores (un televisor y su Chromecast, por
+ejemplo), solo uno se convierte en el reproductor de Música; los demás conservan
+los controles de la versión 1.0.
+
+**Reproductores añadidos con la versión 1.0**: sus nuevas funciones llegan por
+la pestaña **Descubrir**: haga clic en **Actualizar** en el dispositivo. Nada
+más cambia (reproducir, pausa, siguiente, anterior y volumen conservan sus
+identificadores, escenas y paneles siguen funcionando). Una diferencia desde la
+actualización de la integración: un reproductor detenido vale ahora
+**Detenido** (2) y ya no **Pausa** (0) en su estado de reproducción.
 
 ### Widget del panel
 

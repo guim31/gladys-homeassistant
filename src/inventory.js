@@ -73,50 +73,104 @@ export function buildInventory(snapshot, options) {
   const featureEntity = new Map();
   const ignored = new Map();
   const entityDevice = new Map();
+  /** media_player entity_id -> { deviceId, snapshotId, features: { nowPlaying key -> feature id } } */
+  const players = new Map();
   let entityCount = 0;
 
   const areaOf = (reg, haDevice) => areas.get(reg?.area_id ?? haDevice?.area_id);
+  /** feature ids of the devices added in Gladys: kept even when their bit is gone */
+  const existing = options.existing ?? new Set();
 
-  for (const s of states) {
+  /**
+   * The selection of the configuration: `skip` (disabled, excluded, hidden…),
+   * `ignored` (a domain not selected, counted in the connection test) or `ok`.
+   */
+  const select = (s) => {
     const entityId = s?.entity_id;
     if (typeof entityId !== 'string' || !entityId.includes('.')) {
-      continue;
+      return 'skip';
     }
-    const domain = domainOf(entityId);
     const reg = registry.get(entityId);
     if (reg?.disabled_by || excluded(entityId)) {
-      continue;
+      return 'skip';
+    }
+    if (included(entityId)) {
+      return 'ok';
+    }
+    if (!selectedDomains.has(domainOf(entityId))) {
+      return 'ignored';
     }
     const haDevice = reg?.device_id ? haDevices.get(reg.device_id) : undefined;
     const area = areaOf(reg, haDevice);
-    if (!included(entityId)) {
-      if (!selectedDomains.has(domain)) {
-        if (!SILENT_DOMAINS.has(domain)) {
-          ignored.set(domain, (ignored.get(domain) ?? 0) + 1);
-        }
-        continue;
-      }
-      const battery = s.attributes?.device_class === 'battery';
-      if (reg?.hidden_by || (reg?.entity_category && !battery)) {
-        continue;
-      }
-      if (
-        selectedAreas.size > 0 &&
-        !(area && (selectedAreas.has(area.area_id) || selectedAreas.has(area.name.toLowerCase())))
-      ) {
-        continue;
-      }
+    const battery = s.attributes?.device_class === 'battery';
+    if (reg?.hidden_by || (reg?.entity_category && !battery)) {
+      return 'skip';
     }
+    if (
+      selectedAreas.size > 0 &&
+      !(area && (selectedAreas.has(area.area_id) || selectedAreas.has(area.name.toLowerCase())))
+    ) {
+      return 'skip';
+    }
+    return 'ok';
+  };
+
+  // One player per Home Assistant device carries the music features (the Music
+  // widget picks features by type), the others stay as in 1.0: the selected
+  // player that already has them in Gladys, else the smallest registry id.
+  const primaryPlayer = new Map();
+  for (const s of states) {
+    const reg = registry.get(s?.entity_id);
+    const haDevice = reg?.device_id ? haDevices.get(reg.device_id) : undefined;
+    if (
+      domainOf(s?.entity_id) !== 'media_player' ||
+      !haDevice ||
+      haDevice.disabled_by ||
+      select(s) !== 'ok'
+    ) {
+      continue;
+    }
+    const key = reg.id ?? s.entity_id;
+    const added = existing.has(externalIds('device', haDevice.id).feature(`${key}-title`));
+    const current = primaryPlayer.get(haDevice.id);
+    if (
+      current === undefined ||
+      (added && !current.added) ||
+      (added === current.added && key < current.key)
+    ) {
+      primaryPlayer.set(haDevice.id, { key, added });
+    }
+  }
+
+  for (const s of states) {
+    const selection = select(s);
+    if (selection !== 'ok') {
+      if (selection === 'ignored' && !SILENT_DOMAINS.has(domainOf(s.entity_id))) {
+        const domain = domainOf(s.entity_id);
+        ignored.set(domain, (ignored.get(domain) ?? 0) + 1);
+      }
+      continue;
+    }
+    const entityId = s.entity_id;
+    const domain = domainOf(entityId);
+    const reg = registry.get(entityId);
+    const haDevice = reg?.device_id ? haDevices.get(reg.device_id) : undefined;
+    const area = areaOf(reg, haDevice);
+    const entityKey = reg?.id ?? entityId;
     const features = mapEntity(s, {
       allowSecurity: options.allowSecurity,
       temperatureUnit,
+      language,
+      primary:
+        !haDevice ||
+        Boolean(haDevice.disabled_by) ||
+        (primaryPlayer.get(haDevice.id)?.key ?? entityKey) === entityKey,
     });
     if (!Array.isArray(features)) {
       ignored.set(domain, (ignored.get(domain) ?? 0) + 1);
       continue;
     }
 
-    const entityKey = reg?.id ?? entityId;
     const ids =
       haDevice && !haDevice.disabled_by
         ? externalIds('device', haDevice.id)
@@ -156,6 +210,9 @@ export function buildInventory(snapshot, options) {
     const friendly = String(s.attributes?.friendly_name || entityId).trim();
     for (const f of features) {
       const featureId = ids.feature(`${entityKey}-${f.role}`);
+      if (f.present === false && !existing.has(featureId)) {
+        continue;
+      }
       let name = f.main ? friendly : `${friendly} – ${roles[f.role] ?? f.role}`;
       if (entry.names.has(name)) {
         name = `${name} (${entityId})`;
@@ -163,6 +220,16 @@ export function buildInventory(snapshot, options) {
       entry.names.add(name);
       entry.device.features.push({ name: cut(name), external_id: featureId, ...f.spec });
       featureEntity.set(featureId, entityId);
+      if (f.music) {
+        const player = players.get(entityId) ?? {
+          deviceId: ids.device,
+          // One publishNowPlaying snapshot per player: a device can hold several.
+          snapshotId: `${ids.device}:${entityKey}`,
+          features: {},
+        };
+        player.features[f.music] = featureId;
+        players.set(entityId, player);
+      }
       if (f.read) {
         const list = routes.get(entityId) ?? [];
         list.push({ featureId, read: f.read, throttle: Boolean(f.throttle) });
@@ -180,6 +247,7 @@ export function buildInventory(snapshot, options) {
     writers,
     featureEntity,
     entityDevice,
+    players,
     entityCount,
     ignored: [...ignored.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
   };

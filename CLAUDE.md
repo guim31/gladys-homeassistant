@@ -37,6 +37,8 @@ src/bridge.js                     Bridge: connection lifecycle, inventory, live 
 src/ha/socket.js                  Home Assistant WebSocket client (auth, commands, events, ping)
 src/inventory.js                  states + registries -> Gladys devices, routes, writers (pure)
 src/mapping.js                    one entity -> features with read/write (pure), Gladys enums
+src/music.js                      media players: now-playing snapshot, artwork URLs, MediaItems (pure)
+src/artwork-resize.js             artwork made small enough for the core (plain JS, copied from gladys-mopidy)
 src/publisher.js                  states within 300/min, sensor spacing, 12 h heartbeat
 src/scenes.js                     scene actions (call_service, run_script, activate_scene, press_button)
 src/widgets.js                    dashboard widget `status`
@@ -45,7 +47,8 @@ src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
 docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (same sections)
 test/                             node --test, SDK fake Gladys + test/helpers/fakeHa.js
-test/fixtures/ha/                 answers of a real Home Assistant 2026.10.1 (demo integration)
+test/fixtures/ha/                 answers of a real Home Assistant 2026.10.1 (demo integration, browse/search)
+test/fixtures/artwork/            JPEG variants for test/artwork-resize.test.js
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -254,7 +257,8 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   au renommage d'un `entity_id` ; une entité sans registre (pas de `unique_id`) ne peut pas être
   renommée. Les rôles (`state`, `brightness`, `color`, `color_temp`, `command`, `position`,
   `contact`, `target`, `mode`, `current`, `value`, `power`, `playback`, `play`, `pause`, `next`,
-  `previous`, `volume`, `speed`) sont figés.
+  `previous`, `volume`, `speed`, et depuis 1.1 `title`, `artist`, `album`, `artwork`, `duration`,
+  `shuffle`, `repeat`, `mute` ; `position` sert aussi au lecteur) sont figés.
 - **Pièges vérifiés sur HA 2026.10.1** : `rgb_color` est calculé même en mode température (ne publier
   la couleur que si `color_mode` est une couleur) ; `color_temp` en mireds a disparu au profit de
   `color_temp_kelvin` / `min_color_temp_kelvin` ; un `climate` en `heat_cool` n'a pas d'attribut
@@ -267,3 +271,50 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - **Test réel** : `ghcr.io/home-assistant/home-assistant:stable` avec `demo:` dans
   `configuration.yaml`, onboarding et jeton créés par l'API (`/api/onboarding/users`,
   `/auth/token`, puis `auth/long_lived_access_token` en WebSocket).
+
+## Lecteur Musique (Gladys 5.3, SDK 0.16, version 1.1)
+
+- **Un seul canal** : toute fonctionnalité `music` d'un `media_player` (sauf les commandes `play`,
+  `pause`, `next`, `previous`) porte une clé `music` dans `src/mapping.js` et n'a pas de `read` :
+  elle passe par `publishNowPlaying` (`publishPlayer` de `src/bridge.js`), jamais par le
+  publieur d'états. Seules les fonctionnalités d'appareils ajoutés sont envoyées ; un instantané par
+  entité (`snapshotId` = `<appareil>:<clé d'entité>`, un appareil HA peut avoir plusieurs lecteurs),
+  oublié à `onDeviceCreated` / `onDeviceUpdated` / `onDeviceDeleted` (le SDK n'oublie que l'id exact
+  de l'appareil).
+- **Toujours inscriptibles** : `playback_state` (0/1/2) et `position` le sont dès la publication,
+  même si le lecteur ne sait pas le faire : Home Assistant change `supported_features` selon le
+  média (Cast…) et le cœur ne rend jamais inscriptible une fonctionnalité déjà ajoutée en lecture
+  seule. Refus avec message (`seek_unsupported`, `unsupported_value`). Les autres (`power`, `play`,
+  `pause`, `next`, `previous`, `volume`, `shuffle`, `repeat`, `mute`) suivent les bits (`present`
+  dans `src/mapping.js`) **mais restent** sur un appareil déjà ajouté quand le bit disparaît
+  (`existing` de `buildInventory`) : « Mettre à jour » supprime les fonctionnalités absentes, et un
+  Cast inactif perd PAUSE, PLAY, NEXT… `supported_options` de `playback` suit le bit STOP (le cœur
+  les synchronise sans « Mettre à jour »).
+- **Plusieurs `media_player` sur un appareil HA** (Android TV + Cast fusionnés) : le widget Musique
+  indexe les fonctionnalités par type, donc un seul lecteur porte les fonctionnalités 1.1 : parmi
+  les lecteurs sélectionnés (mêmes filtres que l'inventaire : masqué, exclu, pièce), celui qui les a
+  déjà dans Gladys, sinon celui de plus petit id de registre ; les autres gardent exactement leurs fonctionnalités 1.0 (lues par
+  le publieur d'états). Le catalogue vise ce lecteur seul. `pushAll` parcourt les routes **et** les
+  lecteurs (un lecteur sans `power` n'a aucune route).
+- **Délai** : une écriture `media_player` attend 4,5 s au plus (Gladys coupe un set-value à 5 s) ; les
+  ids de MediaItem hachés (> 512) sont gardés dans `/data/media-ids.json` (scènes).
+- **Position** : `media_position` est un échantillon pris à `media_position_updated_at` : la ramener
+  à maintenant en lecture (sinon le SDK la croit sautée). Sans position (lecteur démo `walkman`),
+  `duration: 0` et `position: 0` (« Direct »).
+- **Pochettes** : `entity_picture` vaut `/api/media_player_proxy/<entité>?token=…&cache=…` ; le
+  `token` tourne toutes les ~5 min : il est retiré de l'URL (sinon la clé change), et la requête
+  porte `Authorization: Bearer <jeton longue durée>`, accepté par le proxy (vérifié sur 2026.10.1 :
+  403 sans). Idem `authSig` des chemins signés (`/media/local/…`). Le jeton ne part qu'à l'origine
+  de Home Assistant (préfixe de chemin compris : un autre service peut partager l'origine derrière
+  un proxy), sans suivre de redirection. Le proxy sert l'image d'origine :
+  `artwork-resize.js`.
+- **Catalogue** : `media_player/browse_media` rend tout un niveau (pagination faite ici, réponse
+  gardée 60 s pour « Charger plus ») ; id d'un MediaItem `["<media_content_type>","<media_content_id>"]`
+  (haché au-delà de 512, table dans `/data/media-ids.json`, écrite à part puis renommée). `media_player/search_media` répond `{ result: [...] }`.
+  `play_media` avec `enqueue` sur un lecteur sans `MEDIA_ENQUEUE` est **accepté en silence** (il
+  remplace) : « à la suite » / « en fin de file » sont refusés ici. Pas de file standard → pas de
+  `queue`. Mode `replace` : pas d'`enqueue` (le défaut de chaque intégration, « lire maintenant »).
+- **Banc** (`scratch-homeassistant`, 26/10) : HA 2026.10.1 + `demo:` + `media_dirs` local. Aucun
+  lecteur démo n'a à la fois `BROWSE_MEDIA` et `PLAY_MEDIA` ; le seek du lecteur YouTube démo ne
+  fait rien (service accepté, position inchangée) ; le lecteur `browse` a aussi `SEARCH_MEDIA` mais
+  media_source refuse la recherche sans content id.

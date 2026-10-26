@@ -14,6 +14,7 @@ not affiliated with the Home Assistant project or Nabu Casa.
 
 ## Requirements
 
+- Gladys 5.3 or later.
 - A recent Home Assistant (tested with 2026.10), reachable from the Gladys
   machine (same network, or a VPN).
 - A **long-lived access token**, preferably of an **administrator** account:
@@ -95,7 +96,7 @@ Room)").
 | `binary_sensor` door, window, garage door, opening  | an opening sensor                                              |
 | `binary_sensor` motion, occupancy, presence         | a motion or presence sensor                                    |
 | `binary_sensor` smoke, moisture, CO, tamper, others | smoke, leak, CO, tamper sensors; a generic input otherwise     |
-| `media_player`                                      | power, play, pause, next, previous, volume, playback state     |
+| `media_player`                                      | a Music player (see below) and power                           |
 | `fan`                                               | on/off, speed in %                                             |
 | `lock`                                              | locked or not (read-only unless allowed)                       |
 
@@ -104,6 +105,35 @@ for it (`min_temp`, `max_temp`): a value outside is refused, never changed into
 another one. A thermostat that only takes a range (heat_cool) shows its mode and
 temperature, not a setpoint. A colour light shows its colour in colour mode and
 its colour temperature in white mode.
+
+### Gladys 5.3 Music player
+
+Every `media_player` of Home Assistant becomes a real player in the Gladys
+**Music** widget: artwork, title, artist, album, progress bar, play / pause /
+stop, previous / next, seeking, shuffle, repeat, mute and volume, as far as the
+player allows them in Home Assistant. The widget button opens a panel:
+
+- **Browse**: the media sources of Home Assistant (your media, radios, the
+  libraries of integrations…), like its media browser;
+- **Search**: for players that have search in Home Assistant (2025.2 or later,
+  Music Assistant for example);
+- **Play**, and **Play next** / **Add to queue** for players that have a queue
+  in Home Assistant. There is no "Queue" panel: Home Assistant has no standard
+  one.
+
+The Gladys scene action **Play music on a speaker** starts a playlist, an album or a radio
+picked in that panel. A player that cannot do something (browse, search, start
+a media, seek, stop) refuses it with a clear message. Artwork is read by the
+integration with your token and made smaller when needed: your browser never
+contacts Home Assistant. When one Home Assistant device holds several players (a
+TV and its Chromecast, for example), only one becomes the Music player; the
+others keep the controls of version 1.0.
+
+**Players added with version 1.0**: their new features come through the
+**Discovery** tab: click **Update** on the device. Nothing else changes (play,
+pause, next, previous and volume keep their ids, scenes and dashboards keep
+working). One difference as soon as the integration is updated: a stopped
+player is now **Stopped** (2), no longer **Paused** (0), in its playback state.
 
 ### Dashboard widget
 

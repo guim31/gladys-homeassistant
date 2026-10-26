@@ -17,9 +17,19 @@ export function fixture() {
 
 const later = (fn) => setImmediate(fn);
 
-export function createHa({ data = fixture(), admin = true } = {}) {
+/** browse_media and search_media answers of the same Home Assistant (media players). */
+export function mediaFixture() {
+  return JSON.parse(
+    readFileSync(new URL('../fixtures/ha/media-2026.10.1.json', import.meta.url), 'utf8'),
+  );
+}
+
+const MEDIA_BIT = { browse: 131072, search: 4194304 };
+
+export function createHa({ data = fixture(), admin = true, media = mediaFixture() } = {}) {
   const ha = {
     data,
+    media,
     admin,
     token: TOKEN,
     version: data.auth_ok.ha_version,
@@ -184,6 +194,33 @@ class FakeSocket {
         this.subscriptions.set(m.id, m.event_type);
         return this.result(m.id, null);
       }
+      case 'media_player/browse_media': {
+        const player = ha.state(m.entity_id);
+        if (!player || !(player.attributes.supported_features & MEDIA_BIT.browse)) {
+          return this.error(m.id, 'not_supported', 'Player does not support browsing media');
+        }
+        const node = [ha.media.browse_root, ha.media.browse_media_source, ha.media.browse_bench]
+          .concat(ha.media.extra ?? [])
+          .find((n) =>
+            m.media_content_id === undefined
+              ? n === ha.media.browse_root
+              : n.media_content_id === m.media_content_id ||
+                (m.media_content_id === 'media-source://media_source' &&
+                  n === ha.media.browse_media_source),
+          );
+        if (!node) {
+          return this.error(m.id, 'home_assistant_error', 'Unknown source directory.');
+        }
+        return this.result(m.id, structuredClone(node));
+      }
+      case 'media_player/search_media': {
+        const player = ha.state(m.entity_id);
+        if (!player || !(player.attributes.supported_features & MEDIA_BIT.search)) {
+          const { code, message } = ha.media.search_unsupported.error;
+          return this.error(m.id, code, message);
+        }
+        return this.result(m.id, structuredClone(ha.media.search_hip));
+      }
       case 'call_service': {
         const entityIds = [m.target?.entity_id ?? []].flat();
         for (const id of entityIds) {
@@ -262,6 +299,44 @@ function applyService(ha, domain, service, data, entityIds) {
       });
     } else if (service === 'lock' || service === 'unlock') {
       ha.setState(id, service === 'lock' ? 'locked' : 'unlocked');
+    } else if (domain === 'media_player') {
+      applyMedia(ha, id, s, service, data);
     }
+  }
+}
+
+/** What a demo media player does with the services the music player sends. */
+function applyMedia(ha, id, s, service, data) {
+  const now = new Date().toISOString();
+  switch (service) {
+    case 'media_play':
+      return ha.setState(id, 'playing', { media_position_updated_at: now });
+    case 'media_pause':
+      return ha.setState(id, 'paused', { media_position_updated_at: now });
+    case 'media_stop': {
+      // Unloaded: the media attributes disappear, like on most players.
+      const attributes = Object.fromEntries(
+        Object.entries(s.attributes).filter(
+          ([key]) => !key.startsWith('media_') && key !== 'entity_picture',
+        ),
+      );
+      ha.data.states = ha.data.states.map((x) => (x.entity_id === id ? { ...x, attributes } : x));
+      return ha.setState(id, 'idle');
+    }
+    case 'media_seek':
+      return ha.setState(id, s.state, {
+        media_position: data.seek_position,
+        media_position_updated_at: now,
+      });
+    case 'shuffle_set':
+      return ha.setState(id, s.state, { shuffle: data.shuffle });
+    case 'repeat_set':
+      return ha.setState(id, s.state, { repeat: data.repeat });
+    case 'volume_mute':
+      return ha.setState(id, s.state, { is_volume_muted: data.is_volume_muted });
+    case 'volume_set':
+      return ha.setState(id, s.state, { volume_level: data.volume_level });
+    default:
+      return undefined;
   }
 }
