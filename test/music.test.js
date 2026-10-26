@@ -196,6 +196,8 @@ test('Gladys: the now playing of an added player, one batch, then only the chang
   );
 
   // A pause: the playback state, and the position sample that goes with it (SDK rule).
+  // The power goes through the state publisher, on its own cadence: let it pass first.
+  await until(() => w.fake.lastState(id('power')) === 1, { what: 'the power' });
   const before = w.fake.states.length;
   w.ha.setState('media_player.walkman', 'paused');
   await until(() => w.fake.lastState(id('playback')) === 0, { what: 'the pause' });
