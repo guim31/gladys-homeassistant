@@ -138,7 +138,10 @@ L'action de scène **Lancer une musique sur une enceinte** de Gladys lance une p
 une radio choisis dans ce panneau. Un lecteur qui ne sait pas faire une chose
 (parcourir, rechercher, lancer un média, se déplacer, s'arrêter) la refuse avec
 un message clair. Les pochettes sont lues par l'intégration avec votre jeton,
-réduites si besoin : votre navigateur ne contacte jamais Home Assistant.
+réduites si besoin : votre navigateur ne contacte jamais Home Assistant. Quand
+un appareil Home Assistant regroupe plusieurs lecteurs (téléviseur et Chromecast
+par exemple), un seul devient le lecteur Musique ; les autres gardent les
+commandes de la version 1.0.
 
 **Lecteurs ajoutés avec la version 1.0** : leurs nouvelles fonctionnalités
 arrivent par l'onglet **Découverte** : cliquez sur **Mettre à jour** sur

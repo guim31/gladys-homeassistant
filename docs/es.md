@@ -134,7 +134,10 @@ La acción de escena **Reproducir música en un altavoz** de Gladys inicia una l
 álbum o una radio elegidos en ese panel. Un reproductor que no sabe hacer algo
 (explorar, buscar, iniciar un contenido, desplazarse, detenerse) lo rechaza con
 un mensaje claro. La integración lee las carátulas con su token y las reduce si
-hace falta: su navegador nunca contacta con Home Assistant.
+hace falta: su navegador nunca contacta con Home Assistant. Cuando un dispositivo de Home
+Assistant agrupa varios reproductores (un televisor y su Chromecast, por
+ejemplo), solo uno se convierte en el reproductor de Música; los demás conservan
+los controles de la versión 1.0.
 
 **Reproductores añadidos con la versión 1.0**: sus nuevas funciones llegan por
 la pestaña **Descubrir**: haga clic en **Actualizar** en el dispositivo. Nada

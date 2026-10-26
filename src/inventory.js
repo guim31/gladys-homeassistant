@@ -78,6 +78,29 @@ export function buildInventory(snapshot, options) {
   let entityCount = 0;
 
   const areaOf = (reg, haDevice) => areas.get(reg?.area_id ?? haDevice?.area_id);
+  /** feature ids of the devices added in Gladys: kept even when their bit is gone */
+  const existing = options.existing ?? new Set();
+
+  // One player per Home Assistant device carries the music features: the
+  // media_player of the smallest registry id (stable), the others stay as in 1.0.
+  const primaryPlayer = new Map();
+  for (const s of states) {
+    const entityId = s?.entity_id;
+    const reg = registry.get(entityId);
+    if (
+      typeof entityId !== 'string' ||
+      domainOf(entityId) !== 'media_player' ||
+      !reg?.device_id ||
+      reg.disabled_by
+    ) {
+      continue;
+    }
+    const key = reg.id ?? entityId;
+    const current = primaryPlayer.get(reg.device_id);
+    if (current === undefined || key < current) {
+      primaryPlayer.set(reg.device_id, key);
+    }
+  }
 
   for (const s of states) {
     const entityId = s?.entity_id;
@@ -109,16 +132,21 @@ export function buildInventory(snapshot, options) {
         continue;
       }
     }
+    const entityKey = reg?.id ?? entityId;
     const features = mapEntity(s, {
       allowSecurity: options.allowSecurity,
       temperatureUnit,
+      language,
+      primary:
+        !haDevice ||
+        Boolean(haDevice.disabled_by) ||
+        (primaryPlayer.get(haDevice.id) ?? entityKey) === entityKey,
     });
     if (!Array.isArray(features)) {
       ignored.set(domain, (ignored.get(domain) ?? 0) + 1);
       continue;
     }
 
-    const entityKey = reg?.id ?? entityId;
     const ids =
       haDevice && !haDevice.disabled_by
         ? externalIds('device', haDevice.id)
@@ -158,6 +186,9 @@ export function buildInventory(snapshot, options) {
     const friendly = String(s.attributes?.friendly_name || entityId).trim();
     for (const f of features) {
       const featureId = ids.feature(`${entityKey}-${f.role}`);
+      if (f.present === false && !existing.has(featureId)) {
+        continue;
+      }
       let name = f.main ? friendly : `${friendly} – ${roles[f.role] ?? f.role}`;
       if (entry.names.has(name)) {
         name = `${name} (${entityId})`;

@@ -31,7 +31,11 @@ the notes of the version's GitHub Release.
   playback state, no longer **Paused** (0): check the scenes that wait for 0.
 - Players added with 1.0: click **Update** on the device in the Discovery tab
   to get the new features; play, pause, next, previous, volume and the
-  playback state keep their ids, so scenes and dashboards keep working.
+  playback state keep their ids, so scenes and dashboards keep working. A
+  feature of an added player is no longer dropped when Home Assistant
+  temporarily stops announcing it (an idle Cast player). When one Home
+  Assistant device holds several players, only one becomes the Music player,
+  the others keep their 1.0 features.
 
 ## [1.0.1] - 2026-10-22
 

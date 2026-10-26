@@ -41,6 +41,7 @@ export const BRIDGE_TIMINGS = {
   refreshInterval: 60 * 60_000,
   // Gladys waits 10 s for a music answer, 15 s for an artwork.
   musicTimeout: 8000,
+  setValueTimeout: 4500,
   artworkTimeout: 10_000,
   browseCache: 60_000,
 };
@@ -79,6 +80,7 @@ export class Bridge {
     publisherTimings,
     now = Date.now,
     fetch: fetchImpl = (...args) => globalThis.fetch(...args),
+    dataDir,
   }) {
     this.fetch = fetchImpl;
     this.gladys = gladys;
@@ -113,7 +115,7 @@ export class Bridge {
     this.transports = new Map();
     this.eventWindow = [];
     this.eventsDropped = false;
-    this.mediaIds = new MediaIds();
+    this.mediaIds = new MediaIds({ file: dataDir ? `${dataDir}/media-ids.json` : undefined });
     /** entity_id -> first sight of a position without its timestamp */
     this.samples = new Map();
     /** browse_media answers, for the "load more" pages: key -> { at, node } */
@@ -348,6 +350,7 @@ export class Bridge {
     this.inventory = buildInventory(this.snapshot ?? {}, {
       ...this.config,
       externalIds: this.gladys.externalIds.bind(this.gladys),
+      existing: this.createdFeatures(),
     });
     this.watched = matcher(this.config.watched);
     this.included = matcher(this.config.include);
@@ -473,7 +476,9 @@ export class Bridge {
 
   pushAll() {
     const created = this.createdFeatures();
-    for (const entityId of this.inventory.routes.keys()) {
+    // A media player without power has no route: its features are all now-playing ones.
+    const entities = new Set([...this.inventory.routes.keys(), ...this.inventory.players.keys()]);
+    for (const entityId of entities) {
       this.pushEntity(entityId, created);
     }
   }
@@ -653,7 +658,14 @@ export class Bridge {
       throw err;
     }
     this.logger.info(`Command: ${writer.domain}.${call.service} on ${writer.entityId}`);
-    await this.callService(writer.domain, call.service, call.data ?? {}, writer.entityId);
+    await this.callService(
+      writer.domain,
+      call.service,
+      call.data ?? {},
+      writer.entityId,
+      // Gladys gives a set-value 5 s: a player answers within, or the command is reported failed.
+      writer.domain === 'media_player' ? this.timings.setValueTimeout : undefined,
+    );
   }
 
   // --- Music players (Gladys 5.3) ----------------------------------------------
@@ -672,7 +684,15 @@ export class Bridge {
     if (entities.length === 0) {
       throw this.error('unknown_feature');
     }
-    const entityId = entities.find((id) => has(this.states.get(id) ?? {}, bit));
+    const available = entities.filter((id) =>
+      ['playing', 'paused', 'buffering', 'idle', 'on', 'off', 'standby'].includes(
+        this.states.get(id)?.state,
+      ),
+    );
+    if (available.length === 0) {
+      throw this.error('player_unavailable');
+    }
+    const entityId = available.find((id) => has(this.states.get(id), bit));
     if (!entityId) {
       throw this.error(refusal);
     }
@@ -775,7 +795,8 @@ export class Bridge {
       throw new Error(`Unknown artwork ${key}`);
     }
     const base = httpBase(this.config.url);
-    const own = Boolean(base) && new URL(url).origin === new URL(base).origin;
+    // Home Assistant only, its path prefix included (another service may share the origin).
+    const own = Boolean(base) && url.startsWith(`${base}/`);
     let response;
     try {
       response = await this.fetch(url, {

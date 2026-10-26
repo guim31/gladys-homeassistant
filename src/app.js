@@ -10,7 +10,7 @@ import { widgets } from './widgets.js';
 
 /**
  * @param {import('@gladysassistant/integration-sdk').GladysIntegration} gladys
- * @param {object} [deps] test doubles: createSocket, timers, timings, socketTimings, publisherTimings, now, logger
+ * @param {object} [deps] test doubles: createSocket, timers, timings, socketTimings, publisherTimings, now, logger, fetch, dataDir
  */
 export function registerHandlers(gladys, deps = {}) {
   const logger = deps.logger ?? createLogger({ name: 'homeassistant' });

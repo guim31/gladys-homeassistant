@@ -125,7 +125,9 @@ The Gladys scene action **Play music on a speaker** starts a playlist, an album 
 picked in that panel. A player that cannot do something (browse, search, start
 a media, seek, stop) refuses it with a clear message. Artwork is read by the
 integration with your token and made smaller when needed: your browser never
-contacts Home Assistant.
+contacts Home Assistant. When one Home Assistant device holds several players (a
+TV and its Chromecast, for example), only one becomes the Music player; the
+others keep the controls of version 1.0.
 
 **Players added with version 1.0**: their new features come through the
 **Discovery** tab: click **Update** on the device. Nothing else changes (play,

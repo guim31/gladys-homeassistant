@@ -17,6 +17,7 @@
 // -----------------------------------------------------------------------------
 
 import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { MAX_MEDIA_SECONDS, REPEAT_TO_GLADYS, playbackOf } from './mapping.js';
 
 /** The core drops a MediaItem whose id is longer. */
@@ -56,14 +57,20 @@ export function artworkUrlOf(picture, base) {
   }
   let url;
   try {
-    url = base ? new URL(picture, `${base}/`) : new URL(picture);
+    // A path of Home Assistant ("/api/…") is under its own prefix, if any (a reverse proxy).
+    url =
+      base && picture.startsWith('/') && !picture.startsWith('//')
+        ? new URL(`${base}${picture}`)
+        : base
+          ? new URL(picture, `${base}/`)
+          : new URL(picture);
   } catch {
     return null;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     return null;
   }
-  if (base && url.origin === new URL(base).origin) {
+  if (base && url.href.startsWith(`${base}/`)) {
     url.searchParams.delete('token');
     url.searchParams.delete('authSig');
   }
@@ -139,12 +146,34 @@ export function nowPlayingOf(st, { now, base, samples }) {
 /**
  * MediaItem ids: `[content type, content id]` in JSON, what play_media and
  * browse_media take back together. A pair longer than 512 characters gets a
- * hashed id, remembered while the container runs.
+ * hashed id, remembered in `file` (/data) so that a scene keeping it still
+ * plays after a restart.
  */
 export class MediaIds {
-  constructor(max = 5000) {
+  constructor({ max = 5000, file } = {}) {
     this.max = max;
+    this.file = file;
     this.long = new Map();
+    if (file) {
+      try {
+        for (const [id, raw] of JSON.parse(readFileSync(file, 'utf8'))) {
+          this.long.set(id, raw);
+        }
+      } catch {
+        // none yet, or unreadable: started empty
+      }
+    }
+  }
+
+  save() {
+    if (!this.file) {
+      return;
+    }
+    try {
+      writeFileSync(this.file, JSON.stringify([...this.long]));
+    } catch {
+      // /data unavailable: the ids live until the next restart
+    }
   }
 
   encode(type, id) {
@@ -153,10 +182,14 @@ export class MediaIds {
       return raw;
     }
     const hashed = `ha:${createHash('sha1').update(raw).digest('hex')}`;
+    const known = this.long.has(hashed);
     this.long.delete(hashed);
     this.long.set(hashed, raw);
     if (this.long.size > this.max) {
       this.long.delete(this.long.keys().next().value);
+    }
+    if (!known) {
+      this.save();
     }
     return hashed;
   }

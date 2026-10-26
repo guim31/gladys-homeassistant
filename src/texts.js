@@ -230,6 +230,12 @@ export const ERRORS = {
     de: 'Dieser Player hat in Home Assistant keine Warteschlange: Nur „Abspielen“ funktioniert.',
     es: 'Este reproductor no tiene cola en Home Assistant: solo funciona «Reproducir».',
   },
+  player_unavailable: {
+    en: 'This player is unavailable in Home Assistant.',
+    fr: 'Ce lecteur est indisponible dans Home Assistant.',
+    de: 'Dieser Player ist in Home Assistant nicht verfügbar.',
+    es: 'Este reproductor no está disponible en Home Assistant.',
+  },
   media_unknown: {
     en: 'This media is unknown: choose it again in the list.',
     fr: 'Ce média est inconnu : choisissez-le à nouveau dans la liste.',

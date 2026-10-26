@@ -284,8 +284,19 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - **Toujours inscriptibles** : `playback_state` (0/1/2) et `position` le sont dès la publication,
   même si le lecteur ne sait pas le faire : Home Assistant change `supported_features` selon le
   média (Cast…) et le cœur ne rend jamais inscriptible une fonctionnalité déjà ajoutée en lecture
-  seule. Refus avec message (`seek_unsupported`, `unsupported_value`). `shuffle`, `repeat`, `mute`
-  suivent les bits au moment de l'inventaire (un ajout fait proposer « Mettre à jour »).
+  seule. Refus avec message (`seek_unsupported`, `unsupported_value`). Les autres (`power`, `play`,
+  `pause`, `next`, `previous`, `volume`, `shuffle`, `repeat`, `mute`) suivent les bits (`present`
+  dans `src/mapping.js`) **mais restent** sur un appareil déjà ajouté quand le bit disparaît
+  (`existing` de `buildInventory`) : « Mettre à jour » supprime les fonctionnalités absentes, et un
+  Cast inactif perd PAUSE, PLAY, NEXT… `supported_options` de `playback` suit le bit STOP (le cœur
+  les synchronise sans « Mettre à jour »).
+- **Plusieurs `media_player` sur un appareil HA** (Android TV + Cast fusionnés) : le widget Musique
+  indexe les fonctionnalités par type, donc un seul lecteur porte les fonctionnalités 1.1 : celui
+  de plus petit id de registre ; les autres gardent exactement leurs fonctionnalités 1.0 (lues par
+  le publieur d'états). Le catalogue vise ce lecteur seul. `pushAll` parcourt les routes **et** les
+  lecteurs (un lecteur sans `power` n'a aucune route).
+- **Délai** : une écriture `media_player` attend 4,5 s au plus (Gladys coupe un set-value à 5 s) ; les
+  ids de MediaItem hachés (> 512) sont gardés dans `/data/media-ids.json` (scènes).
 - **Position** : `media_position` est un échantillon pris à `media_position_updated_at` : la ramener
   à maintenant en lecture (sinon le SDK la croit sautée). Sans position (lecteur démo `walkman`),
   `duration: 0` et `position: 0` (« Direct »).
@@ -293,7 +304,8 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   `token` tourne toutes les ~5 min : il est retiré de l'URL (sinon la clé change), et la requête
   porte `Authorization: Bearer <jeton longue durée>`, accepté par le proxy (vérifié sur 2026.10.1 :
   403 sans). Idem `authSig` des chemins signés (`/media/local/…`). Le jeton ne part qu'à l'origine
-  de Home Assistant, sans suivre de redirection. Le proxy sert l'image d'origine :
+  de Home Assistant (préfixe de chemin compris : un autre service peut partager l'origine derrière
+  un proxy), sans suivre de redirection. Le proxy sert l'image d'origine :
   `artwork-resize.js`.
 - **Catalogue** : `media_player/browse_media` rend tout un niveau (pagination faite ici, réponse
   gardée 60 s pour « Charger plus ») ; id d'un MediaItem `["<media_content_type>","<media_content_id>"]`

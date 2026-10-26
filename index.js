@@ -8,7 +8,8 @@ import { GladysIntegration, logger } from '@gladysassistant/integration-sdk';
 import { registerHandlers } from './src/app.js';
 
 const gladys = new GladysIntegration();
-const app = registerHandlers(gladys);
+// /data: the one writable volume (the ids of long media kept for the scenes).
+const app = registerHandlers(gladys, { dataDir: '/data' });
 
 gladys.handleShutdown(async () => {
   app.stop();

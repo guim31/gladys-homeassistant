@@ -8,6 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { validateMediaItems } from '@gladysassistant/integration-sdk';
 import { createHa, fixture } from './helpers/fakeHa.js';
@@ -485,4 +488,114 @@ test('artwork: read with the token from Home Assistant only, resized when too la
   w.bridge.fetch = async () => new Response('', { status: 403 });
   assert.match((await w.fake.musicGetArtwork(own)).error, /HTTP 403/);
   assert.equal((await w.fake.musicGetArtwork('art-000000000000')).success, false);
+});
+
+/** The demo data with the walkman and the kitchen as two players of one Home Assistant device. */
+function twoPlayersOneDevice() {
+  const data = fixture();
+  data.devices.push({ id: 'dev-speaker', name: 'Speaker', area_id: null, disabled_by: null });
+  for (const [entityId, id] of [
+    ['media_player.walkman', 'b-walkman'],
+    ['media_player.kitchen', 'a-kitchen'],
+  ]) {
+    data.entities.push({ entity_id: entityId, id, device_id: 'dev-speaker', platform: 'demo' });
+  }
+  return data;
+}
+
+test('a player without power gets its now playing as soon as it is added', async (t) => {
+  const data = fixture();
+  const walkman = data.states.find((s) => s.entity_id === 'media_player.walkman');
+  walkman.attributes.supported_features &= ~(128 | 256);
+  const w = await world(t, { ha: createHa({ data }) });
+  const discovered = deviceOf(w, 'media_player.walkman');
+  assert.equal(feature(discovered, 'power'), undefined);
+  const device = await addDevice(w, discovered);
+  await until(() => w.fake.lastState(feature(device, 'title').external_id) !== undefined, {
+    what: 'the title without any state_changed',
+  });
+});
+
+test('a feature whose bit went away stays on an added device ("Update" would delete it)', async (t) => {
+  const w = await world(t);
+  const device = await addDevice(w, deviceOf(w, 'media_player.walkman'));
+  // An idle Cast: Home Assistant drops the bits of what it cannot do right now.
+  w.ha.setState('media_player.walkman', 'idle', { supported_features: 4 | 128 | 256 });
+  await w.bridge.loadInventory();
+  const offered = deviceOf(w, 'media_player.walkman').features.map((f) => f.external_id);
+  for (const name of ['next', 'previous', 'shuffle', 'repeat', 'mute', 'play', 'pause']) {
+    assert.ok(offered.includes(feature(device, name).external_id), name);
+  }
+  // Not added: a new install is offered what the player can do now.
+  const kitchen = deviceOf(w, 'media_player.kitchen');
+  w.ha.setState('media_player.kitchen', 'idle', { supported_features: 4 | 128 | 256 });
+  await w.bridge.loadInventory();
+  assert.ok(kitchen.features.some((f) => f.external_id.endsWith('-next')));
+  assert.ok(
+    !deviceOf(w, 'media_player.kitchen').features.some((f) => f.external_id.endsWith('-next')),
+  );
+});
+
+test('two players on one Home Assistant device: one carries the music, the other stays 1.0', async (t) => {
+  const w = await world(t, { ha: createHa({ data: twoPlayersOneDevice() }) });
+  const device = deviceOf(w, 'media_player.kitchen');
+  assert.equal(device.external_id, deviceOf(w, 'media_player.walkman').external_id);
+  const types = (key) =>
+    device.features
+      .filter(
+        (f) => f.external_id.endsWith(`:${key}-playback`) || f.external_id.includes(`:${key}-`),
+      )
+      .map((f) => f.type);
+  // The smallest registry id (a-kitchen) is the player of the device.
+  assert.ok(types('a-kitchen').includes('title'));
+  assert.ok(!types('b-walkman').includes('title'));
+  const legacy = device.features.find((f) => f.external_id.endsWith(':b-walkman-playback'));
+  assert.deepEqual([legacy.max, legacy.read_only], [1, true]);
+  await addDevice(w, device);
+  await until(() => w.fake.lastState(legacy.external_id) === 1, { what: 'the 1.0 playback state' });
+  // The catalog targets that player only.
+  w.ha.setState('media_player.kitchen', 'playing', { supported_features: 914877 | 512 });
+  await settle();
+  await w.fake.musicPlay(device, { id: '["music","x"]', type: 'track' });
+  assert.equal(w.ha.services().at(-1).target, 'media_player.kitchen');
+});
+
+test('an unavailable player says so, and a path prefix of Home Assistant is kept', async (t) => {
+  const w = await world(t);
+  const device = await addDevice(w, deviceOf(w, 'media_player.browse'));
+  w.ha.setState('media_player.browse', 'unavailable', { supported_features: undefined });
+  await settle();
+  assert.match((await w.fake.musicBrowse(device)).error, /indisponible/);
+  // Behind a reverse proxy: the paths of Home Assistant stay under its prefix,
+  // and the token goes to that prefix only.
+  const base = 'https://example.org/ha';
+  assert.equal(
+    artworkUrlOf('/api/media_player_proxy/media_player.x?token=t&cache=1', base),
+    'https://example.org/ha/api/media_player_proxy/media_player.x?cache=1',
+  );
+  assert.equal(
+    artworkUrlOf('https://example.org/other?token=t', base),
+    'https://example.org/other?token=t',
+  );
+  w.bridge.config.url = 'wss://example.org/ha/api/websocket';
+  const requests = [];
+  w.bridge.fetch = async (url, init) => {
+    requests.push(init.headers.authorization);
+    return new Response('', { status: 404 });
+  };
+  await w.fake.musicGetArtwork(w.gladys.artworkKey('https://example.org/other/cover.jpg'));
+  await w.fake.musicGetArtwork(w.gladys.artworkKey('https://example.org/ha/api/x.jpg'));
+  assert.deepEqual(requests, [undefined, `Bearer ${w.bridge.config.token}`]);
+});
+
+test('long media ids are kept in /data for the scenes', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ha-ids-'));
+  try {
+    const file = join(dir, 'media-ids.json');
+    const long = new MediaIds({ file }).encode('music', `media-source://${'y'.repeat(600)}`);
+    assert.equal(new MediaIds({ file }).decode(long).type, 'music', 'after a restart');
+    assert.equal(new MediaIds({ file: join(dir, 'none', 'x.json') }).decode(long), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -515,39 +515,102 @@ const GLADYS_TO_REPEAT = ['off', 'all', 'one'];
 /** Display bound of a duration or a position, in seconds (a live stream shows 0). */
 export const MAX_MEDIA_SECONDS = 86_400;
 
+/** Labels of the playback states offered in Gladys (supported_options), by language. */
+export const PLAYBACK_LABELS = {
+  en: ['Paused', 'Playing', 'Stopped'],
+  fr: ['En pause', 'En lecture', 'Arrêté'],
+  de: ['Pausiert', 'Wiedergabe', 'Gestoppt'],
+  es: ['En pausa', 'Reproduciendo', 'Detenido'],
+};
+
 /**
  * The music features of a player. Every one but `play`/`pause`/`next`/`previous`
- * is published through publishNowPlaying (`music`: its key there), never through
- * the state publisher; the writable ones are writable from the start, even when
+ * (and the features of a secondary player, see below) is published through
+ * publishNowPlaying (`music`: its key there), never through the state
+ * publisher. `playback` and `position` are writable from the start, even when
  * the player cannot do it today (Home Assistant changes supported_features with
  * the media, and Gladys never turns a read-only feature writable on an added
- * device): such a write is refused with a message.
+ * device): such a write is refused with a message. The features that follow a
+ * supported_features bit carry `present`: when the bit is missing, the
+ * inventory still keeps them on a device already added in Gladys ("Update"
+ * would delete them while a Cast player sits idle).
+ *
+ * `primary: false`: another media_player of the same Home Assistant device.
+ * One Gladys device shows one player (the Music widget picks its features by
+ * type), so the others keep their 1.0 features, read by the state publisher.
  */
-function mediaPlayer(s) {
+function mediaPlayer(s, { primary = true, language = 'fr' } = {}) {
   const features = [];
-  if (has(s, MEDIA.TURN_ON) || has(s, MEDIA.TURN_OFF)) {
+  features.push({
+    role: 'power',
+    present: has(s, MEDIA.TURN_ON) || has(s, MEDIA.TURN_OFF),
+    spec: binary(C.SWITCH, T.SWITCH.BINARY),
+    read: (st) =>
+      ['off', 'standby'].includes(st.state)
+        ? 0
+        : ['unavailable', 'unknown'].includes(st.state)
+          ? null
+          : 1,
+    write: (v, st) => {
+      const on = Number(v) > 0;
+      if ((on && !has(st, MEDIA.TURN_ON)) || (!on && !has(st, MEDIA.TURN_OFF))) {
+        throw new WriteError('unsupported_value');
+      }
+      return { service: on ? 'turn_on' : 'turn_off' };
+    },
+  });
+  const command = (role, bit, type, service) => {
     features.push({
-      role: 'power',
-      spec: binary(C.SWITCH, T.SWITCH.BINARY),
+      role,
+      present: has(s, bit),
+      spec: {
+        ...binary(C.MUSIC, type),
+        has_feedback: false,
+        ...(primary ? { keep_history: false } : {}),
+      },
+      write: () => ({ service }),
+    });
+  };
+  const volumeWrite = (v) => ({
+    service: 'volume_set',
+    data: { volume_level: clamp(Math.round(Number(v) || 0), 0, 100) / 100 },
+  });
+  if (!primary) {
+    // The 1.0 features, unchanged: no "Update" offered, the same ids.
+    features.push({
+      role: 'playback',
+      main: true,
+      spec: binary(C.MUSIC, T.MUSIC.PLAYBACK_STATE),
       read: (st) =>
-        ['off', 'standby'].includes(st.state)
-          ? 0
+        st.state === 'playing'
+          ? MUSIC_PLAYBACK_STATE.PLAYING
           : ['unavailable', 'unknown'].includes(st.state)
             ? null
-            : 1,
-      write: (v, st) => {
-        const on = Number(v) > 0;
-        if ((on && !has(st, MEDIA.TURN_ON)) || (!on && !has(st, MEDIA.TURN_OFF))) {
-          throw new WriteError('unsupported_value');
-        }
-        return { service: on ? 'turn_on' : 'turn_off' };
-      },
+            : MUSIC_PLAYBACK_STATE.PAUSED,
     });
+    command('play', MEDIA.PLAY, T.MUSIC.PLAY, 'media_play');
+    command('pause', MEDIA.PAUSE, T.MUSIC.PAUSE, 'media_pause');
+    command('next', MEDIA.NEXT_TRACK, T.MUSIC.NEXT, 'media_next_track');
+    command('previous', MEDIA.PREVIOUS_TRACK, T.MUSIC.PREVIOUS, 'media_previous_track');
+    features.push({
+      role: 'volume',
+      present: has(s, MEDIA.VOLUME_SET),
+      spec: { category: C.MUSIC, type: T.MUSIC.VOLUME, min: 0, max: 100, unit: U.PERCENT },
+      read: (st) => {
+        const v = attr(st, 'volume_level');
+        return finite(v) ? clamp(Math.round(v * 100), 0, 100) : null;
+      },
+      write: volumeWrite,
+    });
+    return features;
   }
-  const music = (role, key, spec, write) => {
+  const music = (role, key, spec, write, present) => {
     features.push({
       role,
       music: key,
+      // The name of the device is the name of its playback state, as in 1.0.
+      ...(role === 'playback' ? { main: true } : {}),
+      ...(present === undefined ? {} : { present }),
       spec: {
         category: C.MUSIC,
         min: 0,
@@ -560,19 +623,35 @@ function mediaPlayer(s) {
     });
   };
   // `playback` (1.0: read-only, 0/1) keeps its id; Gladys offers "Update" (max 1 -> 2).
-  music('playback', 'playback_state', { type: T.MUSIC.PLAYBACK_STATE, max: 2 }, (v, st) => {
-    const value = Number(v);
-    if (value === MUSIC_PLAYBACK_STATE.PLAYING && has(st, MEDIA.PLAY)) {
-      return { service: 'media_play' };
-    }
-    if (value === MUSIC_PLAYBACK_STATE.PAUSED && has(st, MEDIA.PAUSE)) {
-      return { service: 'media_pause' };
-    }
-    if (value === MUSIC_PLAYBACK_STATE.IDLE && has(st, MEDIA.STOP)) {
-      return { service: 'media_stop' };
-    }
-    throw new WriteError('unsupported_value');
-  });
+  // The options follow the STOP bit: Gladys syncs them on an added device without asking.
+  const labels = PLAYBACK_LABELS[language] ?? PLAYBACK_LABELS.en;
+  const states = has(s, MEDIA.STOP) ? [0, 1, 2] : [0, 1];
+  music(
+    'playback',
+    'playback_state',
+    {
+      type: T.MUSIC.PLAYBACK_STATE,
+      max: 2,
+      supported_options: states.map((value) => ({
+        value,
+        label: labels[value],
+        sort_order: value,
+      })),
+    },
+    (v, st) => {
+      const value = Number(v);
+      if (value === MUSIC_PLAYBACK_STATE.PLAYING && has(st, MEDIA.PLAY)) {
+        return { service: 'media_play' };
+      }
+      if (value === MUSIC_PLAYBACK_STATE.PAUSED && has(st, MEDIA.PAUSE)) {
+        return { service: 'media_pause' };
+      }
+      if (value === MUSIC_PLAYBACK_STATE.IDLE && has(st, MEDIA.STOP)) {
+        return { service: 'media_stop' };
+      }
+      throw new WriteError('unsupported_value');
+    },
+  );
   music('title', 'title', { type: T.MUSIC.TITLE });
   music('artist', 'artist', { type: T.MUSIC.ARTIST });
   music('album', 'album', { type: T.MUSIC.ALBUM });
@@ -597,46 +676,44 @@ function mediaPlayer(s) {
       return { service: 'media_seek', data: { seek_position: Math.round(seconds) } };
     },
   );
-  if (has(s, MEDIA.SHUFFLE_SET)) {
-    music('shuffle', 'shuffle', { type: T.MUSIC.SHUFFLE, max: 1 }, (v) => ({
-      service: 'shuffle_set',
-      data: { shuffle: Number(v) > 0 },
-    }));
-  }
-  if (has(s, MEDIA.REPEAT_SET)) {
-    music('repeat', 'repeat', { type: T.MUSIC.REPEAT, max: 2 }, (v) => {
+  music(
+    'shuffle',
+    'shuffle',
+    { type: T.MUSIC.SHUFFLE, max: 1 },
+    (v) => ({ service: 'shuffle_set', data: { shuffle: Number(v) > 0 } }),
+    has(s, MEDIA.SHUFFLE_SET),
+  );
+  music(
+    'repeat',
+    'repeat',
+    { type: T.MUSIC.REPEAT, max: 2 },
+    (v) => {
       const repeat = GLADYS_TO_REPEAT[Number(v)];
       if (!repeat) {
         throw new WriteError('unsupported_value');
       }
       return { service: 'repeat_set', data: { repeat } };
-    });
-  }
-  if (has(s, MEDIA.VOLUME_MUTE)) {
-    music('mute', 'mute', { type: T.MUSIC.MUTE, max: 1 }, (v) => ({
-      service: 'volume_mute',
-      data: { is_volume_muted: Number(v) > 0 },
-    }));
-  }
-  const command = (role, bit, type, service) => {
-    if (has(s, bit)) {
-      features.push({
-        role,
-        spec: { ...binary(C.MUSIC, type), has_feedback: false, keep_history: false },
-        write: () => ({ service }),
-      });
-    }
-  };
+    },
+    has(s, MEDIA.REPEAT_SET),
+  );
+  music(
+    'mute',
+    'mute',
+    { type: T.MUSIC.MUTE, max: 1 },
+    (v) => ({ service: 'volume_mute', data: { is_volume_muted: Number(v) > 0 } }),
+    has(s, MEDIA.VOLUME_MUTE),
+  );
   command('play', MEDIA.PLAY, T.MUSIC.PLAY, 'media_play');
   command('pause', MEDIA.PAUSE, T.MUSIC.PAUSE, 'media_pause');
   command('next', MEDIA.NEXT_TRACK, T.MUSIC.NEXT, 'media_next_track');
   command('previous', MEDIA.PREVIOUS_TRACK, T.MUSIC.PREVIOUS, 'media_previous_track');
-  if (has(s, MEDIA.VOLUME_SET)) {
-    music('volume', 'volume', { type: T.MUSIC.VOLUME, max: 100, unit: U.PERCENT }, (v) => ({
-      service: 'volume_set',
-      data: { volume_level: clamp(Math.round(Number(v) || 0), 0, 100) / 100 },
-    }));
-  }
+  music(
+    'volume',
+    'volume',
+    { type: T.MUSIC.VOLUME, max: 100, unit: U.PERCENT },
+    volumeWrite,
+    has(s, MEDIA.VOLUME_SET),
+  );
   return features;
 }
 
@@ -698,15 +775,20 @@ export const domainOf = (entityId) => String(entityId).split('.')[0];
  * @param {object} [options]
  * @param {boolean} [options.allowSecurity] locks, garage doors and gates controllable
  * @param {string} [options.temperatureUnit] the unit_system temperature of Home Assistant
+ * @param {boolean} [options.primary] media_player: the player of its device (see mediaPlayer)
+ * @param {string} [options.language] labels of the supported options
  * @returns {Array<object> | { skipped: string }}
  */
-export function mapEntity(stateObj, { allowSecurity = false, temperatureUnit = '°C' } = {}) {
+export function mapEntity(
+  stateObj,
+  { allowSecurity = false, temperatureUnit = '°C', primary = true, language = 'fr' } = {},
+) {
   const domain = domainOf(stateObj?.entity_id);
   const build = DOMAINS[domain];
   if (!build) {
     return { skipped: domain };
   }
-  const result = build(stateObj, { allowSecurity, temperatureUnit });
+  const result = build(stateObj, { allowSecurity, temperatureUnit, primary, language });
   if (!Array.isArray(result)) {
     return result;
   }
