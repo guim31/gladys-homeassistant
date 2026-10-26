@@ -73,6 +73,8 @@ export function buildInventory(snapshot, options) {
   const featureEntity = new Map();
   const ignored = new Map();
   const entityDevice = new Map();
+  /** media_player entity_id -> { deviceId, snapshotId, features: { nowPlaying key -> feature id } } */
+  const players = new Map();
   let entityCount = 0;
 
   const areaOf = (reg, haDevice) => areas.get(reg?.area_id ?? haDevice?.area_id);
@@ -163,6 +165,16 @@ export function buildInventory(snapshot, options) {
       entry.names.add(name);
       entry.device.features.push({ name: cut(name), external_id: featureId, ...f.spec });
       featureEntity.set(featureId, entityId);
+      if (f.music) {
+        const player = players.get(entityId) ?? {
+          deviceId: ids.device,
+          // One publishNowPlaying snapshot per player: a device can hold several.
+          snapshotId: `${ids.device}:${entityKey}`,
+          features: {},
+        };
+        player.features[f.music] = featureId;
+        players.set(entityId, player);
+      }
       if (f.read) {
         const list = routes.get(entityId) ?? [];
         list.push({ featureId, read: f.read, throttle: Boolean(f.throttle) });
@@ -180,6 +192,7 @@ export function buildInventory(snapshot, options) {
     writers,
     featureEntity,
     entityDevice,
+    players,
     entityCount,
     ignored: [...ignored.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
   };

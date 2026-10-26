@@ -24,6 +24,14 @@ User documentation: [docs/en.md](docs/en.md) · [docs/fr.md](docs/fr.md) ·
   power, energy index, voltage, current, battery, gas, water…), binary sensors
   (door/window as Gladys opening sensors, motion, presence, smoke, leak, CO,
   tamper), media players, fans, locks.
+- **Music player of Gladys 5.3**: every `media_player` is a full player in the
+  Gladys Music widget (artwork, title, artist, album, progress, play / pause /
+  stop, seek, shuffle, repeat, mute, volume) with the browse panel
+  (`media_player/browse_media`), search (`media_player/search_media`, Home
+  Assistant 2025.2 or later) and play / play next / add to queue
+  (`play_media` with `enqueue`), and the `music.play-media` scene action.
+  Players added with 1.0 get the new features through **Update** in the
+  Discovery tab.
 - **Selection**: by kind of entity, by area, entity patterns to include or
   exclude; hidden, configuration and diagnostic entities left out (battery
   levels kept). States are only sent for the devices added in Gladys, changes
@@ -40,7 +48,7 @@ User documentation: [docs/en.md](docs/en.md) · [docs/fr.md](docs/fr.md) ·
 
 ## Requirements
 
-- Gladys Assistant 5.1.0 or later.
+- Gladys Assistant 5.3.0 or later.
 - Home Assistant reachable from the Gladys machine, and a long-lived access
   token (preferably of an administrator: the device and area registries are
   admin-only).
@@ -57,6 +65,8 @@ In Gladys: **Integrations → Install from GitHub**, address
 Gladys ⇄ SDK ⇄ src/app.js ⇄ src/bridge.js (Bridge) ⇄ src/ha/socket.js ⇄ Home Assistant /api/websocket
                               ├─ src/inventory.js  states + registries -> devices, routes (pure)
                               ├─ src/mapping.js    one entity -> features, readers, writers (pure)
+                              ├─ src/music.js      media players: now playing, MediaItems (pure)
+                              ├─ src/artwork-resize.js  artwork made small enough, plain JS
                               ├─ src/publisher.js  states within 300/min, sensor spacing
                               ├─ src/scenes.js     scene actions
                               └─ src/widgets.js    dashboard widget
@@ -73,6 +83,13 @@ Gladys ⇄ SDK ⇄ src/app.js ⇄ src/bridge.js (Bridge) ⇄ src/ha/socket.js �
   entity without device: `ext:<selector>:entity:<registry id | entity_id>`.
 - **Live**: `subscribe_events` `state_changed`; commands through
   `call_service`, the `state_changed` echo is the feedback.
+- **Music**: a media player's state goes through `publishNowPlaying` (the
+  position sampled at `media_position_updated_at`, brought to now); the
+  artwork key comes from `entity_picture` without its rotating `token`, and
+  the image is read with the long-lived token (`Authorization: Bearer`, sent
+  to Home Assistant only), then reduced to a JPEG of 400 px when above the
+  300 KB the core accepts. MediaItem ids are `["<content type>","<content
+id>"]`, what `play_media` and `browse_media` take back.
 
 Developed without access to many real installations: the mapping follows the
 Home Assistant entity documentation and was checked against the demo
@@ -87,6 +104,8 @@ npm run lint && npm run format:check
 npx github:GladysAssistant/integration-store .  # store admission checks
 ```
 
+`test/fixtures/ha/media-2026.10.1.json` holds real `browse_media` and
+`search_media` answers (demo players and a local media folder).
 `test/fixtures/ha/demo-2026.10.1.json` holds the answers of a real Home
 Assistant 2026.10.1 (`demo` integration plus a few YAML helpers, a door
 template, a script and a scene), read through the WebSocket API, without
@@ -111,6 +130,9 @@ the multi-arch image to GHCR and publishes the GitHub Release.
   and the choices of the bridges of the same family (Jeedom, Domoticz,
   eedomus, Homey Pro) were followed: Discovery tab, one device per source
   device, careful commands.
+- [jpeg-js](https://github.com/jpeg-js/jpeg-js) (BSD-3-Clause): its encoder
+  writes the reduced artworks (`src/artwork-resize.js`, shared with the other
+  music integrations of the author).
 
 ## Limits
 

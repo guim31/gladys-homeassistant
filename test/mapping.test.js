@@ -241,23 +241,49 @@ test('climate: setpoint bounded by Home Assistant (refused, never clamped), hvac
   assert.equal(ft.spec.unit, 'fahrenheit');
 });
 
-test('media player: playback state, commands without feedback, volume in %', () => {
+test('media player: music features, commands without feedback, volume in %', () => {
   const s = state('media_player.walkman');
   const f = mapEntity(s);
   assert.deepEqual(
     f.map((x) => x.role),
-    ['power', 'playback', 'play', 'pause', 'next', 'previous', 'volume'],
+    [
+      'power',
+      'playback',
+      'title',
+      'artist',
+      'album',
+      'artwork',
+      'duration',
+      'position',
+      'shuffle',
+      'repeat',
+      'mute',
+      'play',
+      'pause',
+      'next',
+      'previous',
+      'volume',
+    ],
   );
-  assert.equal(read(f, 'playback', s), 1);
-  assert.equal(read(f, 'playback', { ...s, state: 'paused' }), 0);
-  assert.equal(read(f, 'volume', s), 100);
+  // Everything music goes through publishNowPlaying: no reader for the state publisher.
+  for (const x of f.filter((x) => x.spec.category === 'music')) {
+    assert.equal(x.read, undefined, x.role);
+    assert.equal(x.spec.keep_history, false, x.role);
+  }
+  assert.equal(role(f, 'playback').music, 'playback_state');
+  assert.equal(role(f, 'artwork').music, 'artwork_url');
   assert.equal(role(f, 'play').spec.has_feedback, false);
-  assert.equal(role(f, 'play').read, undefined);
   assert.deepEqual(role(f, 'next').write(1), { service: 'media_next_track' });
   assert.deepEqual(role(f, 'volume').write(35), {
     service: 'volume_set',
     data: { volume_level: 0.35 },
   });
+  // A player without shuffle, repeat or mute does not get them.
+  const browse = mapEntity(state('media_player.browse'));
+  assert.deepEqual(
+    browse.map((x) => x.role),
+    ['playback', 'title', 'artist', 'album', 'artwork', 'duration', 'position'],
+  );
 });
 
 test('fan: on/off and speed in %', () => {
